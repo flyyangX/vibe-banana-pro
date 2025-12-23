@@ -168,6 +168,24 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
       await retryButtons.first().click()
       console.log('✓ Clicked retry button on first card')
       
+      // Handle confirmation dialog if it appears (appears when page already has description)
+      try {
+        const confirmDialog = page.locator('div[role="dialog"]:has-text("确认重新生成")')
+        await confirmDialog.waitFor({ state: 'visible', timeout: 2000 })
+        console.log('  Confirmation dialog appeared, clicking confirm...')
+        
+        // Click the confirm button in the dialog
+        const confirmButton = page.locator('button:has-text("确定"), button:has-text("确认")').last()
+        await confirmButton.click()
+        
+        // Wait for dialog to be completely hidden
+        await confirmDialog.waitFor({ state: 'hidden', timeout: 5000 })
+        console.log('  Confirmed regeneration and dialog closed')
+      } catch (e) {
+        // Dialog didn't appear or already closed, continue
+        console.log('  No confirmation dialog, continuing...')
+      }
+      
       // Wait for the card to show generating state
       await page.waitForSelector('button:has-text("生成中...")', { timeout: 5000 }).catch(() => {
         // If "生成中..." doesn't appear, check for other loading indicators
@@ -190,6 +208,22 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
     // Step 10: Click "生成图片" to go to image generation page
     // ====================================
     console.log('➡️  Step 10: Clicking "生成图片" to go to image generation page...')
+    
+    // First, ensure no modal/dialog is blocking the UI
+    try {
+      const modalOverlay = page.locator('div[role="dialog"]')
+      const modalVisible = await modalOverlay.isVisible().catch(() => false)
+      if (modalVisible) {
+        console.log('  Detected open modal, closing it...')
+        // Try to close modal by pressing Escape or clicking close button
+        await page.keyboard.press('Escape')
+        await modalOverlay.waitFor({ state: 'hidden', timeout: 3000 })
+        console.log('  Modal closed')
+      }
+    } catch (e) {
+      // No modal or already closed
+    }
+    
     const generateImagesNavBtn = page.locator('button:has-text("生成图片")')
     
     // Wait for button to be enabled (it's disabled until all descriptions are generated)
