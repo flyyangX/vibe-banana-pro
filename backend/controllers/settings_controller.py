@@ -321,11 +321,23 @@ def _sync_settings_to_config(settings: Settings):
         logger.info(f"Updated OUTPUT_LANGUAGE to: {settings.output_language}")
     
     # Sync reasoning mode settings (separate for text and image)
+    # Check if reasoning configuration changed (requires AIService cache clear)
+    old_text_reasoning = current_app.config.get("ENABLE_TEXT_REASONING")
+    old_text_budget = current_app.config.get("TEXT_THINKING_BUDGET")
+    old_image_reasoning = current_app.config.get("ENABLE_IMAGE_REASONING")
+    old_image_budget = current_app.config.get("IMAGE_THINKING_BUDGET")
+    
+    if (old_text_reasoning != settings.enable_text_reasoning or 
+        old_text_budget != settings.text_thinking_budget or
+        old_image_reasoning != settings.enable_image_reasoning or
+        old_image_budget != settings.image_thinking_budget):
+        ai_config_changed = True
+        logger.info(f"Reasoning config changed: text={old_text_reasoning}({old_text_budget})->{settings.enable_text_reasoning}({settings.text_thinking_budget}), image={old_image_reasoning}({old_image_budget})->{settings.enable_image_reasoning}({settings.image_thinking_budget})")
+    
     current_app.config["ENABLE_TEXT_REASONING"] = settings.enable_text_reasoning
     current_app.config["TEXT_THINKING_BUDGET"] = settings.text_thinking_budget
     current_app.config["ENABLE_IMAGE_REASONING"] = settings.enable_image_reasoning
     current_app.config["IMAGE_THINKING_BUDGET"] = settings.image_thinking_budget
-    logger.info(f"Updated reasoning config: text={settings.enable_text_reasoning}(budget={settings.text_thinking_budget}), image={settings.enable_image_reasoning}(budget={settings.image_thinking_budget})")
     
     # Sync Baidu OCR settings
     if settings.baidu_ocr_api_key:
