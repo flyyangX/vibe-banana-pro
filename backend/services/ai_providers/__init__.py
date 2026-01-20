@@ -182,11 +182,28 @@ def get_text_provider(model: str = "gemini-3-flash-preview") -> TextProvider:
 
     Returns:
         TextProvider instance (GenAITextProvider or OpenAITextProvider)
+    
+    Note:
+        For GRSAI proxy, always use OpenAI format for text generation
+        to avoid Pydantic validation errors with Gemini SDK
     """
     config = _get_provider_config()
     provider_format = config['format']
 
-    if provider_format == 'openai':
+    # Debug logging
+    api_base_value = config.get('api_base')
+    logger.info(f"get_text_provider: provider_format={provider_format}, api_base={api_base_value}, contains_grsai={'grsai' in (api_base_value or '').lower()}")
+    
+    # Force OpenAI format for GRSAI models to use Chat API
+    api_base_str = (api_base_value or '')
+    if provider_format == 'gemini' and 'grsai' in api_base_str.lower():
+        logger.info(f"Detected GRSAI proxy - forcing OpenAI format for text generation, model: {model}")
+        # Use OpenAI Chat API endpoint for GRSAI
+        api_base = config['api_base'].replace('/v1beta', '/v1')  # Ensure /v1 for Chat API
+        if not api_base.endswith('/v1'):
+            api_base = api_base.rstrip('/') + '/v1'
+        return OpenAITextProvider(api_key=config['api_key'], api_base=api_base, model=model)
+    elif provider_format == 'openai':
         logger.info(f"Using OpenAI format for text generation, model: {model}")
         return OpenAITextProvider(api_key=config['api_key'], api_base=config['api_base'], model=model)
     elif provider_format == 'vertex':
@@ -210,14 +227,29 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
         model: Model name to use
 
     Returns:
-        ImageProvider instance (GenAIImageProvider or OpenAIImageProvider)
+        ImageProvider instance (GRSAIImageProvider, GenAIImageProvider, or OpenAIImageProvider)
 
     Note:
         OpenAI format does NOT support 4K resolution, only 1K is available.
         If you need higher resolution images, use Gemini or Vertex AI format.
+        
+        When using GRSAI proxy with nano-banana models, GRSAIImageProvider is automatically used
+        for better compatibility.
     """
     config = _get_provider_config()
     provider_format = config['format']
+    
+    # Check if using GRSAI proxy with nano-banana models
+    # Use dedicated GRSAI draw API for better compatibility
+    api_base_str = (config.get('api_base') or '')
+    is_grsai_proxy = 'grsai' in api_base_str.lower()
+    is_nano_banana = model and 'nano-banana' in model.lower()
+    
+    if is_grsai_proxy and is_nano_banana:
+        # Use dedicated GRSAI provider for nano-banana models
+        from .image.grsai_provider import GRSAIImageProvider
+        logger.info(f"Detected GRSAI proxy with nano-banana model - using GRSAIImageProvider, model: {model}")
+        return GRSAIImageProvider(api_key=config['api_key'], api_base=api_base_str, model=model)
 
     if provider_format == 'openai':
         logger.info(f"Using OpenAI format for image generation, model: {model}")

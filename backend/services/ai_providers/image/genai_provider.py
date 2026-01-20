@@ -126,13 +126,52 @@ class GenAIImageProvider(ImageProvider):
                     include_thoughts=True  
                 )
             
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=types.GenerateContentConfig(**config_params)
-            )
+            # Check if using GRSAI proxy - use stream mode for compatibility
+            api_base_str = str(self.client.client_config.http_options.api_endpoint) if hasattr(self.client, 'client_config') else ''
+            is_grsai = 'grsai' in api_base_str.lower()
             
-            logger.debug("GenAI API call completed")
+            if is_grsai:
+                logger.info("Detected GRSAI proxy - using stream mode for Gemini-compatible endpoint")
+                # Use stream mode for GRSAI
+                response_stream = self.client.models.generate_content_stream(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(**config_params)
+                )
+                # Collect all chunks
+                response = None
+                for chunk in response_stream:
+                    response = chunk  # Last chunk has complete response
+                logger.debug("GenAI API stream call completed")
+            else:
+                # Use regular mode for official Gemini API
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(**config_params)
+                )
+                logger.debug("GenAI API call completed")
+            
+            # Check if response.parts is None (GRSAI proxy may return None)
+            if response.parts is None:
+                logger.error("Response.parts is None - GRSAI proxy returned non-standard response")
+                logger.error(f"Response type: {type(response)}")
+                # Try to get candidates
+                if hasattr(response, 'candidates'):
+                    logger.error(f"Response.candidates: {response.candidates}")
+                    if response.candidates:
+                        logger.error(f"First candidate: {response.candidates[0]}")
+                        if hasattr(response.candidates[0], 'content'):
+                            logger.error(f"Candidate content: {response.candidates[0].content}")
+                            if hasattr(response.candidates[0].content, 'parts'):
+                                logger.error(f"Candidate content parts: {response.candidates[0].content.parts}")
+                # Try to get JSON representation
+                try:
+                    json_dict = response.to_json_dict()
+                    logger.error(f"Response JSON: {json_dict}")
+                except Exception as e:
+                    logger.error(f"Failed to get JSON dict: {e}")
+                raise ValueError("GRSAI API returned response with None parts - incompatible with Gemini SDK format")
             
             # Extract the final image from the response.
             # Earlier images are usually low resolution drafts 
