@@ -2,26 +2,26 @@
 
 <img width="256" src="https://github.com/user-attachments/assets/6f9e4cf9-912d-4faa-9d37-54fb676f547e">
 
-*Vibe your PPT like vibing code.*
+*Vibe your slides like vibing code.*
 
 **[中文](README.md) | English**
 
 <p>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Anionex/banana-slides?style=square)](https://github.com/Anionex/banana-slides/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/Anionex/banana-slides?style=square)](https://github.com/Anionex/banana-slides/network)
-[![GitHub Watchers](https://img.shields.io/github/watchers/Anionex/banana-slides?style=square)](https://github.com/Anionex/banana-slides/watchers)
+[![GitHub Stars](https://img.shields.io/github/stars/flyyangX/vibe-banana-pro?style=square)](https://github.com/flyyangX/vibe-banana-pro/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/flyyangX/vibe-banana-pro?style=square)](https://github.com/flyyangX/vibe-banana-pro/network)
+[![GitHub Watchers](https://img.shields.io/github/watchers/flyyangX/vibe-banana-pro?style=square)](https://github.com/flyyangX/vibe-banana-pro/watchers)
 
-[![Version](https://img.shields.io/badge/version-v0.3.0-4CAF50.svg)](https://github.com/Anionex/banana-slides)
+[![Version](https://img.shields.io/badge/version-dev-4CAF50.svg)](https://github.com/flyyangX/vibe-banana-pro)
 ![Docker](https://img.shields.io/badge/Docker-Build-2496ED?logo=docker&logoColor=white)
-[![GitHub issues](https://img.shields.io/github/issues-raw/Anionex/banana-slides)](https://github.com/Anionex/banana-slides/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/Anionex/banana-slides)](https://github.com/Anionex/banana-slides/pulls)
+[![GitHub issues](https://img.shields.io/github/issues-raw/flyyangX/vibe-banana-pro)](https://github.com/flyyangX/vibe-banana-pro/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/flyyangX/vibe-banana-pro)](https://github.com/flyyangX/vibe-banana-pro/pulls)
 
 
 </p> 
 
-<b>A native AI PPT generation application based on nano banana pro🍌. It supports generating complete PPT presentations from ideas, outlines, or page descriptions.<br></b>
-<b> Automatically extract charts from attachments, upload any materials, and use natural language to suggest modifications, moving towards a true "Vibe PPT" experience. </b>
+<b>vibe-banana-pro: a multi-style AI slide generation app based on nano banana🍌.<br></b>
+<b>Template-optional generation (auto style & consistent deck), template/style hybrid control, material enhancement, and natural-language iteration.</b>
 
 <b>🎯 Lowering the barrier to PPT creation, allowing everyone to quickly produce beautiful and professional presentations.</b>
 
@@ -34,6 +34,19 @@
 </p>
 
 </div>
+
+## 📌 Attribution
+This repository is a derivative work based on the open-source project [`Anionex/banana-slides`](https://github.com/Anionex/banana-slides).
+
+- **Upstream** provides the core pipeline (parsing / generation / export / editing).
+- **This repo** focuses on productized style workflows: template-optional generation + reusable style packs (e.g. Xiaohongshu-style).
+- Please comply with the `LICENSE` terms in this repository.
+
+## ✨ Notes (why these changes)
+- Template selection is friction: a better default is “it generates”, while templates are optional enhancements.
+- Deck-level consistency is more stable when persisted: generate `template_style` once at project level and reuse it for subsequent pages.
+- UX feedback matters: some steps (e.g. style/prompt preparation) are heavy; immediate feedback prevents repeated clicks & duplicate jobs.
+- Style Packs are a long-term direction: social styles (Xiaohongshu), info-card style, academic style, brand style… can be standardized.
 
 ## ✨ Origin of the Project
 Have you ever found yourself in this situation: a report is due tomorrow, but your PPT is still a blank slate; your mind is full of brilliant ideas, but all your passion is drained by tedious typesetting and design?
@@ -71,7 +84,7 @@ However, the emergence of the nano banana🍌 model changed everything. I tried 
 
 </div>
 
-See more at <a href="https://github.com/Anionex/banana-slides/issues/2" > Case Studies </a>
+See more case studies in the upstream repo: <a href="https://github.com/Anionex/banana-slides/issues/2" > Case Studies (Upstream) </a>
 
 ## 🎯 Features
 
@@ -122,6 +135,11 @@ No longer restricted by complex menu buttons; issue modification commands direct
 > Note: Comparison may become outdated as new features are added.
 
 ## 🔥 Recent Updates
+- 【2026-01-22】Template-optional generation & template UX improvements:
+  - No longer requires selecting a template before generating images
+  - Auto-generate & persist `template_style` when no template is provided (consistent deck style)
+  - “Change Template” now supports cancelling the current template (switch to no-template mode)
+  - UX: prevent repeated submits and keep action buttons always visible in modals
 - 【Jan-03】: Comprehensive upgrade to editable PPTX export:
   1. Supports maximum restoration of font size, color, bolding, etc., from images;
   2. Supports identifying text content in tables;
@@ -146,7 +164,9 @@ No longer restricted by complex menu buttons; issue modification commands direct
 | 🔄 In Progress | Support for multi-layered, precise matting in editable PPTX export |
 | 🔄 In Progress | Web search capability |
 | 🔄 In Progress | Agent mode |
-| 🧭 Planned | Optimize frontend loading speed |
+| 🧭 Planned | Style Packs (Xiaohongshu / Info Cards / Academic / Brand styles) |
+| 🧭 Planned | Style pack management (preview/version/import/export, project-level lock & reuse) |
+| 🧭 Planned | Optimize frontend feedback & job queue visibility |
 | 🧭 Planned | Online playback functionality |
 | 🧭 Planned | Simple animations and page transition effects |
 | 🧭 Planned | Multi-language support |
@@ -168,8 +188,8 @@ If you are using Windows, please install Docker Desktop for Windows first. Check
 
 0. **Clone the repository**
 ```bash
-git clone https://github.com/Anionex/banana-slides
-cd banana-slides
+git clone https://github.com/flyyangX/vibe-banana-pro
+cd vibe-banana-pro
 ```
 
 1. **Configure Environment Variables**
@@ -180,7 +200,7 @@ cp .env.example .env
 ```
 
 Edit the `.env` file and configure the necessary environment variables:
-> **The LLM interface in this project follows the AIHubMix platform format. It is recommended to use [AIHubMix](https://aihubmix.com/?aff=17EC) to obtain an API key to reduce migration costs.**  
+> Tip: the project supports multiple compatible provider formats (Gemini/OpenAI/Vertex). Fill in the values based on your provider.
 ```env
 # AI Provider format configuration (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
@@ -294,8 +314,8 @@ docker compose up -d
 
 0. **Clone the repository**
 ```bash
-git clone https://github.com/Anionex/banana-slides
-cd banana-slides
+git clone https://github.com/flyyangX/vibe-banana-pro
+cd vibe-banana-pro
 ```
 
 1. **Install uv (if not already installed)**
@@ -319,7 +339,7 @@ cp .env.example .env
 ```
 
 Edit the `.env` file and configure your API keys:
-> **The LLM interface follows the AIHubMix platform standard. Use [AIHubMix](https://aihubmix.com/?aff=17EC) to get an API key.** 
+> Tip: the project supports multiple compatible provider formats (Gemini/OpenAI/Vertex). Fill in the values based on your provider.
 ```env
 # AI Provider format (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
@@ -395,7 +415,7 @@ Frontend will start at `http://localhost:3000`.
 ## 📁 Project Structure
 
 ```
-banana-slides/
+vibe-banana-pro/
 ├── frontend/                    # React frontend
 │   ├── src/
 │   │   ├── pages/              # Page components
@@ -425,13 +445,6 @@ banana-slides/
 └── README.md                   # This file
 ```
 
-## Community
-For communication and mutual aid, we have established this WeChat group.
-
-Feel free to suggest new features or provide feedback. I will also answer questions here periodically.
-
-<img width="301" alt="image" src="https://github.com/user-attachments/assets/57e6bae0-b127-4e01-8ccf-5669522b0162" />
-
 **FAQ**
 1.  **Does it support the Gemini API Key free tier?**
     *   The free tier only supports text generation, not image generation.
@@ -447,9 +460,9 @@ Feel free to suggest new features or provide feedback. I will also answer questi
 ## 🤝 Contribution Guidelines
 
 Contributions are welcome via 
-[Issue](https://github.com/Anionex/banana-slides/issues) 
+[Issue](https://github.com/flyyangX/vibe-banana-pro/issues) 
 and 
-[Pull Request](https://github.com/Anionex/banana-slides/pulls)!
+[Pull Request](https://github.com/flyyangX/vibe-banana-pro/pulls)!
 
 ## 📄 License
 
@@ -478,47 +491,7 @@ Any commercial use requires a commercial license.
 
 </details>
 
-<h2>🚀 Sponsor </h2>
-
-<div align="center">
-<a href="https://aihubmix.com/?aff=17EC">
-  <img src="./assets/logo_aihubmix.png" alt="AIHubMix" style="height:48px;">
-</a>
-<p>Thanks to AIHubMix for sponsoring this project</p>
-</div>
-
 ## Acknowledgments
 
-- Contributors:
-
-[![Contributors](https://contrib.rocks/image?repo=Anionex/banana-slides)](https://github.com/Anionex/banana-slides/graphs/contributors)
-
-- [Linux.do](https://linux.do/): A new ideal community.
-
-## Support
-
-Open source is not easy 🙏 If this project is valuable to you, feel free to buy the developer a coffee ☕️
-
-<img width="240" alt="image" src="https://github.com/user-attachments/assets/fd7a286d-711b-445e-aecf-43e3fe356473" />
-
-Thanks to the following friends for their selfless support:
-> @雅俗共赏, @曹峥, @以年观日, @John, @azazo1, @刘聪NLP, @🍟, @苍何, @biubiu  
-> If you have questions about the sponsorship list (e.g., your name is missing after donating), please <a href="mailto:anionex@qq.com">contact the author</a>.
-
-## 📈 Stats
-
-<a href="https://www.star-history.com/#Anionex/banana-slides&type=Timeline&legend=top-left">
-
- <picture>
-
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Anionex/banana-slides&type=Timeline&theme=dark&legend=top-left" />
-
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Anionex/banana-slides&type=Timeline&legend=top-left" />
-
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Anionex/banana-slides&type=Timeline&legend=top-left" />
-
- </picture>
-
-</a>
-
-<br>
+- Upstream project: [`Anionex/banana-slides`](https://github.com/Anionex/banana-slides)
+- Thanks to everyone contributing code, ideas, and feedback to the upstream and this repository.

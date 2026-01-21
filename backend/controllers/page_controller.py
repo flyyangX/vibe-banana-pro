@@ -267,7 +267,8 @@ def generate_page_description(project_id, page_id):
     
     Request body:
     {
-        "force_regenerate": false
+        "force_regenerate": false,
+        "extra_requirements": "单页额外提示词（可选）"
     }
     """
     try:
@@ -283,6 +284,7 @@ def generate_page_description(project_id, page_id):
         data = request.get_json() or {}
         force_regenerate = data.get('force_regenerate', False)
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+        extra_requirements = (data.get('extra_requirements') or '').strip()
         
         # Check if already generated
         if page.get_description_content() and not force_regenerate:
@@ -327,7 +329,8 @@ def generate_page_description(project_id, page_id):
             page_data,
             page.order_index + 1,
             language=language,
-            page_type=infer_page_type(page, total_pages)
+            page_type=infer_page_type(page, total_pages),
+            extra_requirements=extra_requirements
         )
         
         # Save description

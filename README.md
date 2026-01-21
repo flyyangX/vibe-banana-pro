@@ -2,32 +2,32 @@
 
 <img width="256" src="https://github.com/user-attachments/assets/6f9e4cf9-912d-4faa-9d37-54fb676f547e">
 
-*Vibe your PPT like vibing code.*
+*Vibe your slides like vibing code.*
 
-**中文 | [English](README_EN.md)**
+**中文**
 
 <p>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Anionex/banana-slides?style=square)](https://github.com/Anionex/banana-slides/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/Anionex/banana-slides?style=square)](https://github.com/Anionex/banana-slides/network)
-[![GitHub Watchers](https://img.shields.io/github/watchers/Anionex/banana-slides?style=square)](https://github.com/Anionex/banana-slides/watchers)
+[![GitHub Stars](https://img.shields.io/github/stars/flyyangX/vibe-banana-pro?style=square)](https://github.com/flyyangX/vibe-banana-pro/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/flyyangX/vibe-banana-pro?style=square)](https://github.com/flyyangX/vibe-banana-pro/network)
+[![GitHub Watchers](https://img.shields.io/github/watchers/flyyangX/vibe-banana-pro?style=square)](https://github.com/flyyangX/vibe-banana-pro/watchers)
 
-[![Version](https://img.shields.io/badge/version-v0.3.0-4CAF50.svg)](https://github.com/Anionex/banana-slides)
+[![Version](https://img.shields.io/badge/version-dev-4CAF50.svg)](https://github.com/flyyangX/vibe-banana-pro)
 ![Docker](https://img.shields.io/badge/Docker-Build-2496ED?logo=docker&logoColor=white)
-[![GitHub issues](https://img.shields.io/github/issues-raw/Anionex/banana-slides)](https://github.com/Anionex/banana-slides/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/Anionex/banana-slides)](https://github.com/Anionex/banana-slides/pulls)
+[![GitHub issues](https://img.shields.io/github/issues-raw/flyyangX/vibe-banana-pro)](https://github.com/flyyangX/vibe-banana-pro/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/flyyangX/vibe-banana-pro)](https://github.com/flyyangX/vibe-banana-pro/pulls)
 
 
 </p> 
 
-<b>一个基于nano banana pro🍌的原生AI PPT生成应用，支持想法/大纲/页面描述生成完整PPT演示文稿，<br></b>
-<b> 自动提取附件图表、上传任意素材、口头提出修改，迈向真正的"Vibe PPT" </b>
+<b>vibe-banana-pro：一个基于 nano banana🍌 的“多风格”AI PPT 生成应用。<br></b>
+<b>支持无模板生成（自动选风格并保持一致）、模板/风格描述混合控制、素材增强与自然语言迭代。</b>
 
 <b>🎯 降低PPT制作门槛，让每个人都能快速创作出美观专业的演示文稿</b>
 
 <br>
 
-*如果该项目对你有用, 欢迎star🌟 &  fork🍴*
+*如果该项目对你有用, 欢迎 star🌟 & fork🍴*
 
 <br>
 
@@ -35,6 +35,18 @@
 
 </div>
 
+## 📌 派生说明 / Attribution
+本项目为二次开发版，基于开源项目 [`Anionex/banana-slides`](https://github.com/Anionex/banana-slides) 演进而来。
+
+- **上游项目**：提供了完整的 AI PPT 生成基础能力（解析/生成/导出/编辑等）。
+- **本项目定位**：面向“风格化/内容分发”的长期演进版本，围绕“无模板自动风格 + 可扩展风格包（如小红书风格）”做产品化增强。
+- **许可证与署名**：请遵循仓库内 `LICENSE` 的条款（包括署名、使用限制、再分发要求等）。
+
+## ✨ 我的心得（这次改造为什么这样做）
+- **模板选择是摩擦点**：很多用户并不想先“挑模板”，而是希望先把内容跑通；所以更合理的默认是“能生成”，模板作为增强项。
+- **风格一致性必须落在项目级**：只在单页 prompt 里写“保持一致”不够稳定；更可靠的是生成一次 `template_style` 并写入项目，后续复用。
+- **交互反馈比算法更能提升体验**：无模板模式下生成前置步骤更重（例如生成风格/提示词），如果没有即时反馈，用户会反复点按钮导致重复任务。
+- **“风格包”是可持续方向**：小红书风格、本地化社媒风、信息卡片风、极简学术风……都可以抽象为可复用的风格描述模板 + 少量参数。
 
 
 ## ✨ 项目缘起
@@ -75,7 +87,7 @@
 
 </div>
 
-更多可见<a href="https://github.com/Anionex/banana-slides/issues/2" > 使用案例 </a>
+更多案例可在上游项目中查看：<a href="https://github.com/Anionex/banana-slides/issues/2" > 使用案例（上游） </a>
 
 
 ## 🎯 功能介绍
@@ -113,7 +125,7 @@
 
 ### 5. 可自由编辑的pptx导出（Beta迭代中）
 - **导出图像为高还原度、背景干净的、可自由编辑图像和文字的PPT页面**
-- 相关更新见 https://github.com/Anionex/banana-slides/issues/121
+- 相关更新见（上游）：https://github.com/Anionex/banana-slides/issues/121
 <img width="1000"  alt="image" src="https://github.com/user-attachments/assets/a85d2d48-1966-4800-a4bf-73d17f914062" />
 
 <br>
@@ -164,7 +176,9 @@
 | 🔄 进行中 | 支持多层次、精确抠图的可编辑pptx导出 |
 | 🔄 进行中 | 网络搜索 |
 | 🔄 进行中 | Agent 模式 |
-| 🧭 规划中 | 优化前端加载速度 |
+| 🧭 规划中 | 风格包（Style Packs）：小红书风格/信息卡片风/学术报告风/品牌风格等 |
+| 🧭 规划中 | 风格包管理：预览、版本、导入导出、项目级锁定与复用 |
+| 🧭 规划中 | 优化前端加载速度与生成反馈（避免重复提交、任务队列可视化） |
 | 🧭 规划中 | 在线播放功能 |
 | 🧭 规划中 | 简单的动画和页面切换效果 |
 | 🧭 规划中 | 多语种支持 |
@@ -186,8 +200,8 @@
 
 0. **克隆代码仓库**
 ```bash
-git clone https://github.com/Anionex/banana-slides
-cd banana-slides
+git clone https://github.com/flyyangX/vibe-banana-pro
+cd vibe-banana-pro
 ```
 
 1. **配置环境变量**
@@ -198,7 +212,7 @@ cp .env.example .env
 ```
 
 编辑 `.env` 文件，配置必要的环境变量：
-> **项目中大模型接口以AIHubMix平台格式为标准，推荐使用 [AIHubMix](https://aihubmix.com/?aff=17EC) 获取API密钥，减小迁移成本**  
+> 提示：项目支持多种兼容的模型接口配置（Gemini/OpenAI/Vertex 等），你可以按自己的 API 服务商填写 `.env`。
 ```env
 # AI Provider格式配置 (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
@@ -320,8 +334,8 @@ docker compose up -d
 
 0. **克隆代码仓库**
 ```bash
-git clone https://github.com/Anionex/banana-slides
-cd banana-slides
+git clone https://github.com/flyyangX/vibe-banana-pro
+cd vibe-banana-pro
 ```
 
 1. **安装 uv（如果尚未安装）**
@@ -346,7 +360,7 @@ cp .env.example .env
 ```
 
 编辑 `.env` 文件，配置你的 API 密钥：
-> **项目中大模型接口以AIHubMix平台格式为标准，推荐使用 [AIHubMix](https://aihubmix.com/?aff=17EC) 获取API密钥，减小迁移成本** 
+> 提示：项目支持多种兼容的模型接口配置（Gemini/OpenAI/Vertex 等），你可以按自己的 API 服务商填写 `.env`。
 ```env
 # AI Provider格式配置 (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
@@ -533,18 +547,6 @@ banana-slides/
 └── README.md                   # 本文件
 ```
 
-## 交流群
-为了方便大家沟通互助，建此微信交流群.
-
-欢迎提出新功能建议或反馈，本人也会~~佛系~~回答大家问题
-
-<img width="301"  alt="image" src="https://github.com/user-attachments/assets/8812130e-1f79-40e6-893d-694b4f6ff406" />
-
-
-
-
-
-
 **常见问题**
 1.  **支持免费层级的 Gemini API Key 吗？**
     *   免费层级只支持文本生成，不支持图片生成。
@@ -561,9 +563,9 @@ banana-slides/
 ## 🤝 贡献指南
 
 欢迎通过
-[Issue](https://github.com/Anionex/banana-slides/issues)
+[Issue](https://github.com/flyyangX/vibe-banana-pro/issues)
 和
-[Pull Request](https://github.com/Anionex/banana-slides/pulls)
+[Pull Request](https://github.com/flyyangX/vibe-banana-pro/pulls)
 为本项目贡献力量！
 
 ## 📄 许可证
@@ -597,63 +599,8 @@ banana-slides/
 
 
 
-<h2>🚀 Sponsor / 赞助 </h2>
-
-<div align="center">
-<a href="https://aihubmix.com/?aff=17EC">
-  <img src="./assets/logo_aihubmix.png" alt="AIHubMix" style="height:48px;">
-</a>
-<p>感谢AIHubMix对本项目的赞助</p>
-</div>
-
-
-<div align="center">
-
-
- <img width="120" alt="image" src="https://github.com/user-attachments/assets/ac2ad6ec-c1cf-4aaa-859c-756b54168c96" />
-
-<details>
-  <summary>感谢<a href="https://api.chatfire.site/login?inviteCode=A15CD6A0">AI火宝</a>对本项目的赞助</summary>
-  “聚合全球多模型API服务商。更低价格享受安全、稳定且72小时链接全球最新模型的服务。”
-</details>
-
-  
-</div>
-
-
-
 ## 致谢
 
-- 项目贡献者们：
-
-[![Contributors](https://contrib.rocks/image?repo=Anionex/banana-slides)](https://github.com/Anionex/banana-slides/graphs/contributors)
-
-- [Linux.do](https://linux.do/): 新的理想型社区
+- 上游项目：[`Anionex/banana-slides`](https://github.com/Anionex/banana-slides)
+- 社区与贡献者：感谢所有在上游与本仓库贡献代码、建议与反馈的朋友们
   
-## 赞赏
-
-开源不易🙏如果本项目对你有价值，欢迎请开发者喝杯咖啡☕️
-
-<img width="240" alt="image" src="https://github.com/user-attachments/assets/fd7a286d-711b-445e-aecf-43e3fe356473" />
-
-感谢以下朋友对项目的无偿赞助支持：
-> @雅俗共赏、@曹峥、@以年观日、@John、@azazo1、@刘聪NLP、@🍟、@苍何、@biubiu  
-> 如对赞助列表有疑问（如赞赏后没看到您的名字），可<a href="mailto:anionex@qq.com">联系作者</a>
- 
-## 📈 项目统计
-
-<a href="https://www.star-history.com/#Anionex/banana-slides&type=Timeline&legend=top-left">
-
- <picture>
-
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Anionex/banana-slides&type=Timeline&theme=dark&legend=top-left" />
-
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Anionex/banana-slides&type=Timeline&legend=top-left" />
-
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Anionex/banana-slides&type=Timeline&legend=top-left" />
-
- </picture>
-
-</a>
-
-<br>

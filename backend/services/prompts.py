@@ -226,7 +226,8 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
                                 page_outline: dict, page_index: int, 
                                 part_info: str = "",
                                 language: str = None,
-                                page_type: str = None) -> str:
+                                page_type: str = None,
+                                extra_requirements: str = None) -> str:
     """
     生成单个页面描述的 prompt
     
@@ -281,6 +282,9 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
         ),
     }
 
+    extra_req_text = extra_requirements.strip() if extra_requirements else ""
+    extra_req_block = f"\n额外要求（请务必遵循）：\n{extra_req_text}\n" if extra_req_text else ""
+
     prompt = (f"""\
 我们正在为PPT的每一页生成内容描述。
 用户的原始需求是：\n{original_input}\n
@@ -288,6 +292,7 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
 现在请为第 {page_index} 页生成描述：
 {page_outline}
 {desc_type_notes.get(normalized_page_type, "")}
+{extra_req_block}
 
 【重要提示】生成的"页面文字"部分会直接渲染到PPT页面上，因此请务必注意：
 1. 文字内容要简洁精炼，每条要点控制在15-25字以内
@@ -369,6 +374,7 @@ Output requirements:
 3) Cover: overall tone, color palette (with 2-4 colors and optional hex), typography, layout/grid, imagery style, iconography, data visualization, and consistency rules.
 4) Ensure the style supports story flow, clear hierarchy, and readability.
 5) Use a single consistent style across all slides.
+6) Do NOT include headers, footers, page numbers, breadcrumbs, navigation bars, watermarks, or print artifacts unless explicitly required by the user input.
 {get_language_instruction(language)}
 """)
     
@@ -455,6 +461,7 @@ def get_image_generation_prompt(page_desc: str, outline_text: str,
 </page_description>
 
 <reference_information>
+以下内容仅用于理解上下文，不得出现在最终画面中：
 整个PPT的大纲为：
 {outline_text}
 
@@ -469,6 +476,8 @@ def get_image_generation_prompt(page_desc: str, outline_text: str,
 3) 必须完整渲染 <page_description> 内的全部文字：不遗漏、不改写、不新增无关文本。
 4) 如非必要，禁止出现 markdown 符号（如 #、* 等）。
 5) {template_style_guideline}
+6) 除非 <page_description> 明确要求，否则禁止出现页眉/页脚/页码/面包屑/导航条/水印/打印页码等页面装饰。
+7) 禁止渲染 <reference_information> 中的任何文字（包括“当前位于章节：...”），除非 <page_description> 明确要求展示章节/面包屑/导航信息。
 {forbidden_template_text_guidline}</constraints>
 
 <preferences>

@@ -187,12 +187,19 @@ export const generatePageDescription = async (
   projectId: string,
   pageId: string,
   forceRegenerate: boolean = false,
-  language?: OutputLanguage
+  language?: OutputLanguage,
+  extraRequirements?: string
 ): Promise<ApiResponse> => {
   const lang = language || await getStoredOutputLanguage();
   const response = await apiClient.post<ApiResponse>(
     `/api/projects/${projectId}/pages/${pageId}/generate/description`,
-    { force_regenerate: forceRegenerate , language: lang}
+    {
+      force_regenerate: forceRegenerate,
+      language: lang,
+      ...(extraRequirements && extraRequirements.trim()
+        ? { extra_requirements: extraRequirements }
+        : {}),
+    }
   );
   return response.data;
 };

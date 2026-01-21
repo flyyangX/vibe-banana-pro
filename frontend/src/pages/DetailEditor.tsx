@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, ImagePlus } from 'lucide-react';
-import { Button, Loading, useToast, useConfirm, AiRefineInput, FilePreviewModal, ProjectResourcesList } from '@/components/shared';
+import { Button, Loading, useToast, useConfirm, AiRefineInput, FilePreviewModal, ProjectResourcesList, Modal, Textarea } from '@/components/shared';
 import { DescriptionCard } from '@/components/preview/DescriptionCard';
 import { useProjectStore } from '@/store/useProjectStore';
 import { refineDescriptions } from '@/api/endpoints';
@@ -24,6 +24,10 @@ export const DetailEditor: React.FC = () => {
   const { confirm, ConfirmDialog } = useConfirm();
   const [isAiRefining, setIsAiRefining] = React.useState(false);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+  const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false);
+  const [regenerateTargetPageId, setRegenerateTargetPageId] = useState<string | null>(null);
+  const [regenerateExtraPrompt, setRegenerateExtraPrompt] = useState('');
+  const [isSubmittingRegenerate, setIsSubmittingRegenerate] = useState(false);
 
   // 加载项目数据
   useEffect(() => {
@@ -61,8 +65,18 @@ export const DetailEditor: React.FC = () => {
     }
   };
 
+  const openRegenerateModal = (pageId: string) => {
+    setRegenerateTargetPageId(pageId);
+    setRegenerateExtraPrompt('');
+    setIsRegenerateModalOpen(true);
+  };
+
   const handleRegeneratePage = async (pageId: string) => {
     if (!currentProject) return;
+    if (pageDescriptionGeneratingTasks[pageId]) {
+      show({ message: '该页面正在生成中，请稍候...', type: 'info' });
+      return;
+    }
     
     const page = currentProject.pages.find((p) => p.id === pageId);
     if (!page) return;
@@ -71,30 +85,30 @@ export const DetailEditor: React.FC = () => {
     if (page.description_content) {
       confirm(
         '该页面已有描述，重新生成将覆盖现有内容，确定继续吗？',
-        async () => {
-          try {
-            await generatePageDescription(pageId);
-            show({ message: '生成成功', type: 'success' });
-          } catch (error: any) {
-            show({ 
-              message: `生成失败: ${error.message || '未知错误'}`, 
-              type: 'error' 
-            });
-          }
-        },
+        () => openRegenerateModal(pageId),
         { title: '确认重新生成', variant: 'warning' }
       );
       return;
     }
-    
+
+    openRegenerateModal(pageId);
+  };
+
+  const handleConfirmRegenerate = async () => {
+    if (!regenerateTargetPageId || isSubmittingRegenerate) return;
+    setIsSubmittingRegenerate(true);
+    setIsRegenerateModalOpen(false);
+
     try {
-      await generatePageDescription(pageId);
-      show({ message: '生成成功', type: 'success' });
-    } catch (error: any) {
-      show({ 
-        message: `生成失败: ${error.message || '未知错误'}`, 
-        type: 'error' 
+      await generatePageDescription(regenerateTargetPageId, {
+        extraRequirements: regenerateExtraPrompt,
+        forceRegenerate: true,
       });
+      show({ message: '已开始生成该页描述，请稍候...', type: 'success' });
+    } catch (error: any) {
+      show({ message: `生成失败: ${error.message || '未知错误'}`, type: 'error' });
+    } finally {
+      setIsSubmittingRegenerate(false);
     }
   };
 
@@ -303,6 +317,40 @@ export const DetailEditor: React.FC = () => {
       <ToastContainer />
       {ConfirmDialog}
       <FilePreviewModal fileId={previewFileId} onClose={() => setPreviewFileId(null)} />
+
+      {/* 单页重新生成描述（支持额外提示词） */}
+      <Modal
+        isOpen={isRegenerateModalOpen}
+        onClose={() => setIsRegenerateModalOpen(false)}
+        title="重新生成本页描述"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Textarea
+            label="单页额外提示词（可选，仅本页生效）"
+            placeholder="例如：更学术严谨、增加对比数据、强调关键结论..."
+            value={regenerateExtraPrompt}
+            onChange={(e) => setRegenerateExtraPrompt(e.target.value)}
+            rows={4}
+          />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              onClick={() => setIsRegenerateModalOpen(false)}
+              disabled={isSubmittingRegenerate}
+            >
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleConfirmRegenerate}
+              disabled={isSubmittingRegenerate}
+            >
+              {isSubmittingRegenerate ? '正在提交...' : '开始生成'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

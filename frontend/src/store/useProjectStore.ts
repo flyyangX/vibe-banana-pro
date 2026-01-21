@@ -73,7 +73,10 @@ interface ProjectState {
   generateOutline: () => Promise<void>;
   generateFromDescription: () => Promise<void>;
   generateDescriptions: () => Promise<void>;
-  generatePageDescription: (pageId: string) => Promise<void>;
+  generatePageDescription: (
+    pageId: string,
+    options?: { extraRequirements?: string; forceRegenerate?: boolean }
+  ) => Promise<void>;
   generateImages: (pageIds?: string[], options?: { useTemplate?: boolean }) => Promise<void>;
   generateSinglePageImage: (
     pageId: string,
@@ -689,7 +692,10 @@ const debouncedUpdatePage = debounce(
   },
 
   // 生成单页描述
-  generatePageDescription: async (pageId: string) => {
+  generatePageDescription: async (
+    pageId: string,
+    options?: { extraRequirements?: string; forceRegenerate?: boolean }
+  ) => {
     const { currentProject, pageDescriptionGeneratingTasks } = get();
     if (!currentProject) return;
 
@@ -713,8 +719,15 @@ const debouncedUpdatePage = debounce(
       // 立即同步一次项目数据，以更新页面状态
       await get().syncProject();
       
-      // 传递 force_regenerate=true 以允许重新生成已有描述
-      await api.generatePageDescription(currentProject.id, pageId, true);
+      const forceRegenerate = options?.forceRegenerate ?? true;
+      const extraRequirements = options?.extraRequirements?.trim() || undefined;
+      await api.generatePageDescription(
+        currentProject.id,
+        pageId,
+        forceRegenerate,
+        undefined,
+        extraRequirements
+      );
       
       // 刷新项目数据
       await get().syncProject();

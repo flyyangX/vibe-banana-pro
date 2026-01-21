@@ -351,7 +351,8 @@ class AIService:
     
     def generate_page_description(self, project_context: ProjectContext, outline: List[Dict], 
                                  page_outline: Dict, page_index: int,
-                                 language='zh', page_type: str = None) -> str:
+                                 language='zh', page_type: str = None,
+                                 extra_requirements: Optional[str] = None) -> str:
         """
         Generate description for a single page
         Based on demo.py gen_desc() logic
@@ -374,7 +375,8 @@ class AIService:
             page_index=page_index,
             part_info=part_info,
             language=language,
-            page_type=page_type
+            page_type=page_type,
+            extra_requirements=extra_requirements
         )
         
         # 根据 enable_text_reasoning 配置调整 thinking_budget
