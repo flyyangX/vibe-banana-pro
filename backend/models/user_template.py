@@ -2,6 +2,7 @@
 User Template model - stores user-uploaded templates
 """
 import uuid
+import json
 from datetime import datetime
 from . import db
 
@@ -17,8 +18,20 @@ class UserTemplate(db.Model):
     file_path = db.Column(db.String(500), nullable=False)
     thumb_path = db.Column(db.String(500), nullable=True)  # Thumbnail path for faster loading
     file_size = db.Column(db.Integer, nullable=True)  # File size in bytes
+    product_tags = db.Column(db.Text, nullable=True, default='["universal"]')  # JSON array
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_product_tags(self):
+        if not self.product_tags:
+            return ["universal"]
+        try:
+            data = json.loads(self.product_tags)
+            if isinstance(data, list) and data:
+                return [str(tag) for tag in data if str(tag).strip()]
+        except Exception:
+            pass
+        return ["universal"]
 
     def to_dict(self):
         """Convert to dictionary"""
@@ -33,6 +46,7 @@ class UserTemplate(db.Model):
             'name': self.name,
             'template_image_url': f'/files/user-templates/{self.id}/{self.file_path.split("/")[-1]}',
             'thumb_url': thumb_url,
+            'product_tags': self.get_product_tags(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

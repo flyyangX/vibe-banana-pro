@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Task } from '@/types';
+import type { Project, Task, ProductType } from '@/types';
 import * as api from '@/api/endpoints';
 import { debounce, normalizeProject, normalizeErrorMessage } from '@/utils';
 
@@ -54,7 +54,13 @@ interface ProjectState {
   setError: (error: string | null) => void;
   
   // 项目操作
-  initializeProject: (type: 'idea' | 'outline' | 'description', content: string, templateImage?: File, templateStyle?: string) => Promise<void>;
+  initializeProject: (
+    type: 'idea' | 'outline' | 'description',
+    content: string,
+    templateImage?: File,
+    templateStyle?: string,
+    productType?: ProductType
+  ) => Promise<void>;
   syncProject: (projectId?: string) => Promise<void>;
   
   // 页面操作
@@ -164,7 +170,7 @@ const debouncedUpdatePage = debounce(
   setError: (error) => set({ error }),
 
   // 初始化项目
-  initializeProject: async (type, content, templateImage, templateStyle) => {
+  initializeProject: async (type, content, templateImage, templateStyle, productType) => {
     set({ isGlobalLoading: true, error: null });
     try {
       const request: any = {};
@@ -180,6 +186,10 @@ const debouncedUpdatePage = debounce(
       // 添加风格描述（如果有）
       if (templateStyle && templateStyle.trim()) {
         request.template_style = templateStyle.trim();
+      }
+
+      if (productType) {
+        request.product_type = productType;
       }
       
       // 1. 创建项目

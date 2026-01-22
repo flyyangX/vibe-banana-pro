@@ -6,7 +6,7 @@ from flask import Blueprint, request, current_app
 from models import db, Project, Page, PageImageVersion, Task
 from utils import success_response, error_response, not_found, bad_request
 from services import FileService, ProjectContext
-from services.ai_service_manager import get_ai_service
+from services.ai_service_manager import get_ai_service, get_cached_refined_template_style
 from services.task_manager import task_manager, generate_single_page_image_task, edit_page_image_task
 from datetime import datetime
 from pathlib import Path
@@ -519,24 +519,47 @@ def generate_page_image(project_id, page_id):
                 additional_ref_images = image_urls
                 has_material_images = True
         
-        # 无模板时自动生成风格描述（写入 project.template_style）
-        should_generate_style = (not project.template_style) and (not has_template_resource or use_template is False)
-        if should_generate_style:
+        # 无模板时：准备“有效风格描述”（不覆盖用户手写风格，但仍可做智能整理/补全）
+        no_template_mode = (not has_template_resource) or (use_template is False)
+        effective_template_style = (project.template_style or "").strip()
+
+        if no_template_mode:
             project_context = ProjectContext(project)
             outline_text = project.outline_text or ai_service.generate_outline_text(outline)
-            template_style = ai_service.generate_template_style(
-                project_context=project_context,
-                outline_text=outline_text,
-                extra_requirements=project.extra_requirements,
-                language=language
-            )
-            project.template_style = template_style.strip()
-            db.session.commit()
+
+            if not effective_template_style:
+                # 1) 没有风格描述：自动生成并写入（保持历史行为：生成并锁定）
+                template_style = ai_service.generate_template_style(
+                    project_context=project_context,
+                    outline_text=outline_text,
+                    extra_requirements=project.extra_requirements,
+                    existing_template_style=None,
+                    language=language
+                )
+                effective_template_style = (template_style or "").strip()
+                project.template_style = effective_template_style
+                db.session.commit()
+            else:
+                # 2) 已有风格描述：不覆盖；仅在“批量开始的首次请求”做一次整理/补全，并缓存复用（保证风格统一）
+                effective_template_style = get_cached_refined_template_style(
+                    project_id=project_id,
+                    base_style=effective_template_style,
+                    outline_text=outline_text,
+                    extra_requirements=project.extra_requirements or "",
+                    language=language or "",
+                    generate_fn=lambda: ai_service.generate_template_style(
+                        project_context=project_context,
+                        outline_text=outline_text,
+                        extra_requirements=project.extra_requirements,
+                        existing_template_style=effective_template_style,
+                        language=language
+                    )
+                ).strip()
 
         # 合并额外要求和风格描述
         combined_requirements = project.extra_requirements or ""
-        if project.template_style:
-            style_requirement = f"\n\nppt页面风格描述：\n\n{project.template_style}"
+        if effective_template_style:
+            style_requirement = f"\n\nppt页面风格描述：\n\n{effective_template_style}"
             combined_requirements = combined_requirements + style_requirement
 
         # 追加单页额外提示词（不落库，只用于本次生成）

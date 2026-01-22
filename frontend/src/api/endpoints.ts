@@ -22,6 +22,7 @@ export const createProject = async (data: CreateProjectRequest): Promise<ApiResp
     outline_text: data.outline_text,
     description_text: data.description_text,
     template_style: data.template_style,
+    product_type: data.product_type,
   });
   return response.data;
 };
@@ -267,6 +268,194 @@ export const generateImages = async (projectId: string, language?: OutputLanguag
   const response = await apiClient.post<ApiResponse>(
     `/api/projects/${projectId}/generate/images`,
     { language: lang, page_ids: pageIds }
+  );
+  return response.data;
+};
+
+/**
+ * 生成信息图
+ */
+export const generateInfographic = async (
+  projectId: string,
+  options?: {
+    mode?: 'single' | 'series';
+    pageIds?: string[];
+    language?: OutputLanguage;
+    aspectRatio?: string;
+    resolution?: string;
+    maxWorkers?: number;
+    useTemplate?: boolean;
+  }
+): Promise<ApiResponse> => {
+  const lang = options?.language || await getStoredOutputLanguage();
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/generate/infographic`,
+    {
+      mode: options?.mode || 'single',
+      language: lang,
+      ...(options?.pageIds && options.pageIds.length > 0 ? { page_ids: options.pageIds } : {}),
+      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(options?.resolution ? { resolution: options.resolution } : {}),
+      ...(options?.maxWorkers ? { max_workers: options.maxWorkers } : {}),
+      ...(options?.useTemplate !== undefined ? { use_template: options.useTemplate } : {}),
+    }
+  );
+  return response.data;
+};
+
+/**
+ * 生成小红书图文（竖版轮播）
+ */
+export const generateXhs = async (
+  projectId: string,
+  options?: {
+    imageCount?: number; // 6-9
+    aspectRatio?: '4:5' | '3:4' | '9:16';
+    resolution?: string;
+    maxWorkers?: number;
+    useTemplate?: boolean;
+    templateUsageMode?: 'auto' | 'template' | 'style';
+    language?: OutputLanguage;
+  }
+): Promise<ApiResponse> => {
+  const lang = options?.language || await getStoredOutputLanguage();
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/generate/xhs`,
+    {
+      language: lang,
+      ...(typeof options?.imageCount === 'number' ? { image_count: options.imageCount } : {}),
+      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(options?.resolution ? { resolution: options.resolution } : {}),
+      ...(options?.maxWorkers ? { max_workers: options.maxWorkers } : {}),
+      ...(typeof options?.useTemplate === 'boolean' ? { use_template: options.useTemplate } : {}),
+      ...(options?.templateUsageMode ? { template_usage_mode: options.templateUsageMode } : {}),
+    }
+  );
+  return response.data;
+};
+
+/**
+ * 生成单张小红书图文卡片
+ */
+export const generateXhsCard = async (
+  projectId: string,
+  options: {
+    index: number;
+    aspectRatio?: '4:5' | '3:4' | '9:16';
+    resolution?: string;
+    useTemplate?: boolean;
+    templateUsageMode?: 'auto' | 'template' | 'style';
+    language?: OutputLanguage;
+  }
+): Promise<ApiResponse> => {
+  const lang = options?.language || await getStoredOutputLanguage();
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/generate/xhs/card`,
+    {
+      index: options.index,
+      language: lang,
+      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(options?.resolution ? { resolution: options.resolution } : {}),
+      ...(typeof options?.useTemplate === 'boolean' ? { use_template: options.useTemplate } : {}),
+      ...(options?.templateUsageMode ? { template_usage_mode: options.templateUsageMode } : {}),
+    }
+  );
+  return response.data;
+};
+
+/**
+ * 编辑单张小红书图文卡片（基于已生成图片）
+ */
+export const editXhsCardImage = async (
+  projectId: string,
+  options: {
+    index: number;
+    editInstruction: string;
+    aspectRatio?: '4:5' | '3:4' | '9:16';
+    resolution?: string;
+    templateUsageMode?: 'auto' | 'template' | 'style';
+    descImageUrls?: string[];
+    uploadedFiles?: File[];
+  }
+): Promise<ApiResponse> => {
+  const formData = new FormData();
+  formData.append('index', String(options.index));
+  formData.append('edit_instruction', options.editInstruction);
+  if (options.aspectRatio) {
+    formData.append('aspect_ratio', options.aspectRatio);
+  }
+  if (options.resolution) {
+    formData.append('resolution', options.resolution);
+  }
+  if (options.templateUsageMode) {
+    formData.append('template_usage_mode', options.templateUsageMode);
+  }
+  if (options.descImageUrls && options.descImageUrls.length > 0) {
+    formData.append('desc_image_urls', JSON.stringify(options.descImageUrls));
+  }
+  if (options.uploadedFiles && options.uploadedFiles.length > 0) {
+    options.uploadedFiles.forEach((file) => formData.append('context_images', file));
+  }
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/generate/xhs/card/edit`,
+    formData
+  );
+  return response.data;
+};
+
+export interface XhsCardImageVersion {
+  version_id: string;
+  project_id: string;
+  index: number;
+  material_id: string;
+  version_number: number;
+  is_current: boolean;
+  created_at?: string;
+  material_url?: string;
+  display_name?: string;
+  material_created_at?: string;
+}
+
+export const getXhsCardImageVersions = async (
+  projectId: string,
+  index: number
+): Promise<ApiResponse<{ versions: XhsCardImageVersion[] }>> => {
+  const response = await apiClient.get<ApiResponse<{ versions: XhsCardImageVersion[] }>>(
+    `/api/projects/${projectId}/xhs/cards/${index}/image-versions`
+  );
+  return response.data;
+};
+
+export const setXhsCardCurrentImageVersion = async (
+  projectId: string,
+  index: number,
+  versionId: string
+): Promise<ApiResponse> => {
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/xhs/cards/${index}/image-versions/${versionId}/set-current`
+  );
+  return response.data;
+};
+
+/**
+ * 生成小红书图文蓝图（仅文案+卡片内容，不出图）
+ */
+export const generateXhsBlueprint = async (
+  projectId: string,
+  options?: {
+    aspectRatio?: '4:5' | '3:4' | '9:16';
+    language?: OutputLanguage;
+    copywritingOnly?: boolean;
+  }
+): Promise<ApiResponse> => {
+  const lang = options?.language || await getStoredOutputLanguage();
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/generate/xhs/blueprint`,
+    {
+      language: lang,
+      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(options?.copywritingOnly ? { copywriting_only: true } : {}),
+    }
   );
   return response.data;
 };
@@ -836,6 +1025,7 @@ export interface UserTemplate {
   name?: string;
   template_image_url: string;
   thumb_url?: string;  // Thumbnail URL for faster loading
+  product_tags?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -845,12 +1035,16 @@ export interface UserTemplate {
  */
 export const uploadUserTemplate = async (
   templateImage: File,
-  name?: string
+  name?: string,
+  productTags?: string[]
 ): Promise<ApiResponse<UserTemplate>> => {
   const formData = new FormData();
   formData.append('template_image', templateImage);
   if (name) {
     formData.append('name', name);
+  }
+  if (productTags && productTags.length > 0) {
+    formData.append('product_tags', JSON.stringify(productTags));
   }
 
   const response = await apiClient.post<ApiResponse<UserTemplate>>(
@@ -863,9 +1057,10 @@ export const uploadUserTemplate = async (
 /**
  * 获取用户模板列表
  */
-export const listUserTemplates = async (): Promise<ApiResponse<{ templates: UserTemplate[] }>> => {
+export const listUserTemplates = async (productTag?: string): Promise<ApiResponse<{ templates: UserTemplate[] }>> => {
   const response = await apiClient.get<ApiResponse<{ templates: UserTemplate[] }>>(
-    '/api/user-templates'
+    '/api/user-templates',
+    productTag ? { params: { product_tag: productTag } } : undefined
   );
   return response.data;
 };

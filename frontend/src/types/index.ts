@@ -5,7 +5,16 @@ export type PageStatus = 'DRAFT' | 'DESCRIPTION_GENERATED' | 'GENERATING' | 'COM
 export type PageType = 'auto' | 'cover' | 'content' | 'transition' | 'ending';
 
 // 项目状态
-export type ProjectStatus = 'DRAFT' | 'OUTLINE_GENERATED' | 'DESCRIPTIONS_GENERATED' | 'COMPLETED';
+export type ProjectStatus =
+  | 'DRAFT'
+  | 'OUTLINE_GENERATED'
+  | 'DESCRIPTIONS_GENERATED'
+  | 'COMPLETED'
+  | 'GENERATING_INFOGRAPHIC'
+  | 'GENERATING_XHS';
+
+// 产物类型
+export type ProductType = 'ppt' | 'infographic' | string;
 
 // 大纲内容
 export interface OutlineContent {
@@ -69,6 +78,8 @@ export interface Project {
   description_text?: string;  // 用户输入的描述文本（用于description类型）
   extra_requirements?: string; // 额外要求，应用到每个页面的AI提示词
   creation_type?: string;
+  product_type?: ProductType;
+  product_payload?: string | null;
   template_image_url?: string; // 后端返回 template_image_url
   template_image_path?: string; // 前端使用的别名
   template_variants?: Record<string, string>;
@@ -112,6 +123,7 @@ export interface CreateProjectRequest {
   description_text?: string;
   template_image?: File;
   template_style?: string;
+  product_type?: ProductType;
 }
 
 // API响应

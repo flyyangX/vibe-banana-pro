@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, ImagePreviewList } from '@/components/shared';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, uploadMaterial, associateMaterialsToProject, listProjects } from '@/api/endpoints';
+import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, uploadMaterial, associateMaterialsToProject, listProjects, updateProject } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { PRESET_STYLES } from '@/config/presetStyles';
 
@@ -16,6 +16,9 @@ export const Home: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<CreationType>('idea');
   const [content, setContent] = useState('');
+  const [productType, setProductType] = useState<'ppt' | 'infographic' | 'xiaohongshu'>('ppt');
+  const [infographicMode, setInfographicMode] = useState<'single' | 'series'>('single');
+  const [xhsAspectRatio, setXhsAspectRatio] = useState<'4:5' | '3:4'>('4:5');
   const [selectedTemplate, setSelectedTemplate] = useState<File | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedPresetTemplateId, setSelectedPresetTemplateId] = useState<string | null>(null);
@@ -397,25 +400,39 @@ export const Home: React.FC = () => {
         console.warn('检查历史项目失败，跳过提示:', error);
       }
 
-      // 如果有模板ID但没有File，按需加载
-      let templateFile = selectedTemplate;
-      if (!templateFile && (selectedTemplateId || selectedPresetTemplateId)) {
+      // PPT 模式：如果有模板ID但没有File，按需加载；其他产物类型不传 template
+      let templateFile = productType === 'ppt' ? selectedTemplate : null;
+      if (productType === 'ppt' && !templateFile && (selectedTemplateId || selectedPresetTemplateId)) {
         const templateId = selectedTemplateId || selectedPresetTemplateId;
         if (templateId) {
           templateFile = await getTemplateFile(templateId, userTemplates);
         }
       }
       
-      // 传递风格描述（只要有内容就传递，不管开关状态）
+      // 传递风格描述（目前后端只在 PPT/信息图里会用到；xhs 也允许先存着，后续可扩展）
       const styleDesc = templateStyle.trim() ? templateStyle.trim() : undefined;
       
-      await initializeProject(activeTab, content, templateFile || undefined, styleDesc);
+      await initializeProject(activeTab, content, templateFile || undefined, styleDesc, productType);
       
       // 根据类型跳转到不同页面
       const projectId = localStorage.getItem('currentProjectId');
       if (!projectId) {
         show({ message: '项目创建失败', type: 'error' });
         return;
+      }
+
+      // 记录非PPT产物的偏好参数到 product_payload，便于刷新/历史进入时恢复
+      if (productType === 'infographic' || productType === 'xiaohongshu') {
+        try {
+          const payload =
+            productType === 'infographic'
+              ? { product_type: 'infographic', mode: infographicMode }
+              : { product_type: 'xiaohongshu', mode: 'vertical_carousel', aspect_ratio: xhsAspectRatio };
+          await updateProject(projectId, { product_payload: JSON.stringify(payload) });
+        } catch (e) {
+          // 不影响主流程
+          console.warn('写入 product_payload 失败，跳过:', e);
+        }
       }
       
       // 关联参考文件到项目
@@ -460,7 +477,10 @@ export const Home: React.FC = () => {
         console.log('No materials to associate');
       }
       
-      if (activeTab === 'idea' || activeTab === 'outline') {
+      if (productType === 'infographic' || productType === 'xiaohongshu') {
+        // 非 PPT 产物也先进入编辑链路，待编辑完成后再生成图片
+        navigate(`/project/${projectId}/outline`);
+      } else if (activeTab === 'idea' || activeTab === 'outline') {
         navigate(`/project/${projectId}/outline`);
       } else if (activeTab === 'description') {
         // 从描述生成：直接跳到描述生成页（因为已经自动生成了大纲和描述）
@@ -625,6 +645,105 @@ export const Home: React.FC = () => {
             })}
           </div>
 
+          {/* 产物类型选择 */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => setProductType('ppt')}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                productType === 'ppt'
+                  ? 'bg-banana-500 text-black shadow-yellow'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-banana-50'
+              }`}
+            >
+              生成 PPT
+            </button>
+            <button
+              type="button"
+              onClick={() => setProductType('infographic')}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                productType === 'infographic'
+                  ? 'bg-banana-500 text-black shadow-yellow'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-banana-50'
+              }`}
+            >
+              生成信息图
+            </button>
+            <button
+              type="button"
+              onClick={() => setProductType('xiaohongshu')}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                productType === 'xiaohongshu'
+                  ? 'bg-banana-500 text-black shadow-yellow'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-banana-50'
+              }`}
+            >
+              小红书图文
+            </button>
+          </div>
+
+          {productType === 'infographic' && (
+            <div className="flex items-center gap-2 mb-4 text-sm text-gray-600">
+              <span className="font-medium">信息图模式：</span>
+              <button
+                type="button"
+                onClick={() => setInfographicMode('single')}
+                className={`px-3 py-1 rounded-full border text-xs ${
+                  infographicMode === 'single'
+                    ? 'border-banana-500 text-banana-700 bg-banana-50'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                单张
+              </button>
+              <button
+                type="button"
+                onClick={() => setInfographicMode('series')}
+                className={`px-3 py-1 rounded-full border text-xs ${
+                  infographicMode === 'series'
+                    ? 'border-banana-500 text-banana-700 bg-banana-50'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                多张
+              </button>
+              <span className="text-xs text-gray-500">可在生成页再切换</span>
+            </div>
+          )}
+
+          {productType === 'xiaohongshu' && (
+            <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">竖图比例：</span>
+                <button
+                  type="button"
+                  onClick={() => setXhsAspectRatio('4:5')}
+                  className={`px-3 py-1 rounded-full border text-xs ${
+                    xhsAspectRatio === '4:5'
+                      ? 'border-banana-500 text-banana-700 bg-banana-50'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  4:5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setXhsAspectRatio('3:4')}
+                  className={`px-3 py-1 rounded-full border text-xs ${
+                    xhsAspectRatio === '3:4'
+                      ? 'border-banana-500 text-banana-700 bg-banana-50'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  3:4
+                </button>
+              </div>
+              <div className="text-xs text-gray-500">
+                张数默认由 AI 判断（如需指定，请在描述中说明）
+              </div>
+            </div>
+          )}
+
           {/* 描述 */}
           <div className="relative">
             <p className="text-sm md:text-base mb-4 md:mb-6 leading-relaxed">
@@ -744,7 +863,7 @@ export const Home: React.FC = () => {
             {useTemplateStyle ? (
               <div className="space-y-3">
                 <Textarea
-                  placeholder="描述您想要的 PPT 风格，例如：简约商务风格，使用蓝色和白色配色，字体清晰大方..."
+                  placeholder="描述您想要的风格，例如：简约商务风格，使用蓝色和白色配色，字体清晰大方..."
                   value={templateStyle}
                   onChange={(e) => setTemplateStyle(e.target.value)}
                   rows={3}

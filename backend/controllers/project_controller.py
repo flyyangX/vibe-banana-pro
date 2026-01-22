@@ -11,13 +11,18 @@ from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
 from werkzeug.exceptions import BadRequest
 
-from models import db, Project, Page, Task, ReferenceFile
+from models import db, Project, Page, Task, ReferenceFile, Material, XhsCardImageVersion
 from services import ProjectContext
-from services.ai_service_manager import get_ai_service
+from services.ai_service_manager import get_ai_service, get_cached_refined_template_style
 from services.task_manager import (
     task_manager,
     generate_descriptions_task,
-    generate_images_task
+    generate_images_task,
+    generate_infographic_task,
+    generate_xhs_task,
+    generate_xhs_single_card_task,
+    edit_xhs_card_image_task,
+    update_xhs_payload_material
 )
 from utils import (
     success_response, error_response, not_found, bad_request,
@@ -187,6 +192,10 @@ def create_project():
         if creation_type not in ['idea', 'outline', 'descriptions']:
             return bad_request("Invalid creation_type")
         
+        product_type = (data.get('product_type') or 'ppt').strip().lower()
+        if product_type not in ['ppt', 'infographic', 'xiaohongshu']:
+            return bad_request("Invalid product_type")
+
         # Create project
         project = Project(
             creation_type=creation_type,
@@ -194,6 +203,7 @@ def create_project():
             outline_text=data.get('outline_text'),
             description_text=data.get('description_text'),
             template_style=data.get('template_style'),
+            product_type=product_type,
             status='DRAFT'
         )
         
@@ -275,6 +285,10 @@ def update_project(project_id):
         # Update template_style if provided
         if 'template_style' in data:
             project.template_style = data['template_style']
+
+        # Update product_payload if provided
+        if 'product_payload' in data:
+            project.product_payload = data['product_payload']
 
         # Update export settings if provided
         if 'export_extractor_method' in data:
@@ -755,25 +769,48 @@ def generate_images(project_id):
         # Get singleton AI service instance
         ai_service = get_ai_service()
 
-        # 无模板时自动生成风格描述（写入 project.template_style）
-        should_generate_style = (not project.template_style) and (not has_template_resource or use_template is False)
-        if should_generate_style:
+        # 无模板时：准备“有效风格描述”（不覆盖用户手写风格，但仍可做智能整理/补全）
+        no_template_mode = (not has_template_resource) or (use_template is False)
+        effective_template_style = (project.template_style or "").strip()
+
+        if no_template_mode:
             reference_files_content = _get_project_reference_files_content(project_id)
             project_context = ProjectContext(project, reference_files_content)
             outline_text = project.outline_text or ai_service.generate_outline_text(outline)
-            template_style = ai_service.generate_template_style(
-                project_context=project_context,
-                outline_text=outline_text,
-                extra_requirements=project.extra_requirements,
-                language=language
-            )
-            project.template_style = template_style.strip()
-            db.session.commit()
+
+            if not effective_template_style:
+                # 1) 没有风格描述：自动生成并写入（生成并锁定）
+                template_style = ai_service.generate_template_style(
+                    project_context=project_context,
+                    outline_text=outline_text,
+                    extra_requirements=project.extra_requirements,
+                    existing_template_style=None,
+                    language=language
+                )
+                effective_template_style = (template_style or "").strip()
+                project.template_style = effective_template_style
+                db.session.commit()
+            else:
+                # 2) 已有风格描述：不覆盖；整理/补全结果做短期缓存，避免重复调用并保持风格一致
+                effective_template_style = get_cached_refined_template_style(
+                    project_id=project_id,
+                    base_style=effective_template_style,
+                    outline_text=outline_text,
+                    extra_requirements=project.extra_requirements or "",
+                    language=language or "",
+                    generate_fn=lambda: ai_service.generate_template_style(
+                        project_context=project_context,
+                        outline_text=outline_text,
+                        extra_requirements=project.extra_requirements,
+                        existing_template_style=effective_template_style,
+                        language=language
+                    )
+                ).strip()
         
         # 合并额外要求和风格描述
         combined_requirements = project.extra_requirements or ""
-        if project.template_style:
-            style_requirement = f"\n\nppt页面风格描述：\n\n{project.template_style}"
+        if effective_template_style:
+            style_requirement = f"\n\nppt页面风格描述：\n\n{effective_template_style}"
             combined_requirements = combined_requirements + style_requirement
         
         # Get app instance for background task
@@ -810,6 +847,641 @@ def generate_images(project_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"generate_images failed: {str(e)}", exc_info=True)
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/generate/infographic', methods=['POST'])
+def generate_infographic(project_id):
+    """
+    POST /api/projects/{project_id}/generate/infographic - Generate infographic images
+
+    Request body:
+    {
+        "mode": "single|series",
+        "page_ids": ["..."],  # optional for series
+        "language": "zh|en|ja|auto",
+        "use_template": true,  # optional
+        "aspect_ratio": "9:16",  # optional
+        "resolution": "2K",      # optional
+        "max_workers": 6         # optional
+    }
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        data = request.get_json() or {}
+        mode = (data.get('mode') or 'single').strip().lower()
+        if mode not in ['single', 'series']:
+            return bad_request("Invalid mode, must be 'single' or 'series'")
+
+        page_ids = parse_page_ids_from_body(data)
+        pages = get_filtered_pages(project_id, page_ids if page_ids else None)
+
+        if mode == 'series' and not pages:
+            return bad_request("No pages found for project")
+
+        outline = _reconstruct_outline_from_pages(pages) if pages else []
+
+        # Defaults
+        aspect_ratio = data.get('aspect_ratio') or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
+        resolution = data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')
+        max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 6))
+        language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+
+        from services import FileService
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        template_path = file_service.get_template_path(project_id)
+        use_template_raw = data.get('use_template')
+        if use_template_raw is None:
+            use_template = bool(template_path)
+        else:
+            if isinstance(use_template_raw, str):
+                use_template = use_template_raw.lower() == 'true'
+            else:
+                use_template = bool(use_template_raw)
+
+        task = Task(
+            project_id=project_id,
+            task_type='GENERATE_INFOGRAPHIC',
+            status='PENDING'
+        )
+        task.set_progress({
+            'total': 1 if mode == 'single' else len(pages),
+            'completed': 0,
+            'failed': 0
+        })
+        db.session.add(task)
+        db.session.commit()
+
+        # file_service already created above
+        ai_service = get_ai_service()
+        app = current_app._get_current_object()
+
+        task_manager.submit_task(
+            task.id,
+            generate_infographic_task,
+            project_id,
+            ai_service,
+            file_service,
+            outline,
+            mode,
+            max_workers,
+            aspect_ratio,
+            resolution,
+            app,
+            language,
+            page_ids if page_ids else None,
+            use_template
+        )
+
+        project.status = 'GENERATING_INFOGRAPHIC'
+        db.session.commit()
+
+        return success_response({
+            'task_id': task.id,
+            'status': 'GENERATING_INFOGRAPHIC',
+            'mode': mode
+        }, status_code=202)
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"generate_infographic failed: {str(e)}", exc_info=True)
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/generate/xhs', methods=['POST'])
+def generate_xhs(project_id):
+    """
+    POST /api/projects/{project_id}/generate/xhs - Generate Xiaohongshu image+text pack (vertical carousel)
+
+    Request body:
+    {
+        "image_count": 7,         # optional, 6-9
+        "aspect_ratio": "4:5",    # optional, default 4:5 (or 3:4)
+        "resolution": "2K",       # optional
+        "max_workers": 6,         # optional
+        "language": "zh|en|ja|auto"
+    }
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        data = request.get_json() or {}
+        language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+        template_usage_mode = (data.get('template_usage_mode') or '').strip()
+        use_template = data.get('use_template', None)
+        if isinstance(use_template, str):
+            use_template = use_template.lower() in ['1', 'true', 'yes']
+        if template_usage_mode == 'template':
+            use_template = True
+        elif template_usage_mode == 'style':
+            use_template = False
+
+        # Params with validation
+        image_count = data.get('image_count', 7)
+        try:
+            image_count = int(image_count)
+        except Exception:
+            return bad_request("image_count must be an integer")
+        if image_count < 1:
+            return bad_request("image_count must be greater than 0")
+
+        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
+        if aspect_ratio not in ['4:5', '3:4', '9:16']:
+            return bad_request("aspect_ratio must be one of 4:5, 3:4, 9:16")
+
+        resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
+        max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 6))
+        try:
+            max_workers = int(max_workers)
+        except Exception:
+            return bad_request("max_workers must be an integer")
+        if max_workers < 1 or max_workers > 16:
+            return bad_request("max_workers must be an integer between 1 and 16")
+
+        task = Task(
+            project_id=project_id,
+            task_type='GENERATE_XHS',
+            status='PENDING'
+        )
+        task.set_progress({
+            'total': image_count,
+            'completed': 0,
+            'failed': 0
+        })
+        db.session.add(task)
+        db.session.commit()
+
+        from services import FileService
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        ai_service = get_ai_service()
+        app = current_app._get_current_object()
+
+        task_manager.submit_task(
+            task.id,
+            generate_xhs_task,
+            project_id,
+            ai_service,
+            file_service,
+            image_count,
+            aspect_ratio,
+            resolution,
+            max_workers,
+            use_template,
+            app,
+            language
+        )
+
+        project.status = 'GENERATING_XHS'
+        db.session.commit()
+
+        return success_response(
+            {
+                'task_id': task.id,
+                'status': 'GENERATING_XHS',
+                'image_count': image_count,
+                'aspect_ratio': aspect_ratio
+            },
+            status_code=202
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"generate_xhs failed: {str(e)}", exc_info=True)
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/generate/xhs/card', methods=['POST'])
+def generate_xhs_card(project_id):
+    """
+    POST /api/projects/{project_id}/generate/xhs/card - Generate a single XHS card image
+
+    Request body:
+    {
+        "index": 0,
+        "aspect_ratio": "4:5",
+        "resolution": "2K",
+        "language": "zh|en|ja|auto"
+    }
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        if project.product_type != 'xiaohongshu':
+            return bad_request("Project is not xiaohongshu type")
+
+        data = request.get_json() or {}
+        if 'index' not in data:
+            return bad_request("index is required")
+
+        try:
+            index = int(data.get('index'))
+        except Exception:
+            return bad_request("index must be an integer")
+
+        pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+        if not pages:
+            return bad_request("No pages found for project")
+        if index < 0 or index >= len(pages):
+            return bad_request("index out of range")
+
+        language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+        template_usage_mode = (data.get('template_usage_mode') or '').strip()
+        use_template = data.get('use_template', None)
+        if isinstance(use_template, str):
+            use_template = use_template.lower() in ['1', 'true', 'yes']
+        if template_usage_mode == 'template':
+            use_template = True
+        elif template_usage_mode == 'style':
+            use_template = False
+        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
+        if aspect_ratio not in ['4:5', '3:4', '9:16']:
+            return bad_request("aspect_ratio must be one of 4:5, 3:4, 9:16")
+
+        resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
+
+        task = Task(
+            project_id=project_id,
+            task_type='GENERATE_XHS_CARD',
+            status='PENDING'
+        )
+        task.set_progress({
+            'total': 1,
+            'completed': 0,
+            'failed': 0
+        })
+        db.session.add(task)
+        db.session.commit()
+
+        from services import FileService
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        ai_service = get_ai_service()
+        app = current_app._get_current_object()
+
+        task_manager.submit_task(
+            task.id,
+            generate_xhs_single_card_task,
+            project_id,
+            index,
+            ai_service,
+            file_service,
+            aspect_ratio,
+            resolution,
+            use_template,
+            app,
+            language
+        )
+
+        project.status = 'GENERATING_XHS'
+        db.session.commit()
+
+        return success_response(
+            {
+                'task_id': task.id,
+                'status': 'GENERATING_XHS',
+                'index': index,
+                'aspect_ratio': aspect_ratio
+            },
+            status_code=202
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"generate_xhs_card failed: {str(e)}", exc_info=True)
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/generate/xhs/card/edit', methods=['POST'])
+def edit_xhs_card(project_id):
+    """
+    POST /api/projects/{project_id}/generate/xhs/card/edit - Edit a single XHS card image
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        # Parse request data (support JSON or multipart/form-data)
+        if request.is_json:
+            data = request.get_json() or {}
+            uploaded_files = []
+        else:
+            data = request.form.to_dict()
+            uploaded_files = request.files.getlist('context_images')
+            if 'desc_image_urls' in data and data['desc_image_urls']:
+                try:
+                    data['desc_image_urls'] = json.loads(data['desc_image_urls'])
+                except Exception:
+                    data['desc_image_urls'] = []
+
+        if 'index' not in data:
+            return bad_request("index is required")
+        try:
+            index = int(data.get('index'))
+        except Exception:
+            return bad_request("index must be an integer")
+
+        edit_instruction = data.get('edit_instruction') or data.get('instruction')
+        if not edit_instruction:
+            return bad_request("edit_instruction is required")
+
+        pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+        if not pages:
+            return bad_request("No pages found for project")
+        if index < 0 or index >= len(pages):
+            return bad_request("index out of range")
+
+        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
+        if aspect_ratio not in ['4:5', '3:4', '9:16']:
+            return bad_request("aspect_ratio must be one of 4:5, 3:4, 9:16")
+        resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
+
+        template_usage_mode = (data.get('template_usage_mode') or '').strip()
+        use_template = data.get('use_template', None)
+        if isinstance(use_template, str):
+            use_template = use_template.lower() in ['1', 'true', 'yes']
+        if template_usage_mode == 'template':
+            use_template = True
+        elif template_usage_mode == 'style':
+            use_template = False
+        else:
+            context_images = data.get('context_images', {})
+            if isinstance(context_images, dict) and 'use_template' in context_images:
+                use_template = bool(context_images.get('use_template'))
+
+        additional_ref_images = []
+        context_images = data.get('context_images', {})
+        if isinstance(context_images, dict):
+            desc_image_urls = context_images.get('desc_image_urls', [])
+        else:
+            desc_image_urls = data.get('desc_image_urls', [])
+        if isinstance(desc_image_urls, str):
+            try:
+                desc_image_urls = json.loads(desc_image_urls)
+            except Exception:
+                desc_image_urls = []
+        if isinstance(desc_image_urls, list):
+            additional_ref_images.extend([str(u) for u in desc_image_urls if u])
+
+        temp_dir = None
+        if uploaded_files:
+            import tempfile
+            import shutil
+            from werkzeug.utils import secure_filename
+            from pathlib import Path
+            temp_dir = Path(tempfile.mkdtemp(dir=current_app.config['UPLOAD_FOLDER']))
+            try:
+                for uploaded_file in uploaded_files:
+                    if uploaded_file.filename:
+                        temp_path = temp_dir / secure_filename(uploaded_file.filename)
+                        uploaded_file.save(str(temp_path))
+                        additional_ref_images.append(str(temp_path))
+            except Exception as e:
+                if temp_dir and temp_dir.exists():
+                    shutil.rmtree(temp_dir)
+                raise e
+
+        task = Task(
+            project_id=project_id,
+            task_type='EDIT_XHS_CARD_IMAGE',
+            status='PENDING'
+        )
+        task.set_progress({
+            'total': 1,
+            'completed': 0,
+            'failed': 0
+        })
+        db.session.add(task)
+        db.session.commit()
+
+        from services import FileService
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        ai_service = get_ai_service()
+        app = current_app._get_current_object()
+
+        task_manager.submit_task(
+            task.id,
+            edit_xhs_card_image_task,
+            project_id,
+            index,
+            edit_instruction,
+            ai_service,
+            file_service,
+            aspect_ratio,
+            resolution,
+            additional_ref_images if additional_ref_images else None,
+            use_template,
+            str(temp_dir) if temp_dir else None,
+            app
+        )
+
+        project.status = 'GENERATING_XHS'
+        db.session.commit()
+
+        return success_response(
+            {
+                'task_id': task.id,
+                'status': 'GENERATING_XHS',
+                'index': index,
+                'aspect_ratio': aspect_ratio
+            },
+            status_code=202
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"edit_xhs_card failed: {str(e)}", exc_info=True)
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/xhs/cards/<int:index>/image-versions', methods=['GET'])
+def get_xhs_card_versions(project_id, index: int):
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        versions = XhsCardImageVersion.query.filter_by(
+            project_id=project_id,
+            index=index
+        ).order_by(XhsCardImageVersion.version_number.desc()).all()
+
+        version_payload = []
+        for v in versions:
+            material = Material.query.get(v.material_id)
+            version_payload.append({
+                **v.to_dict(),
+                'material_url': material.url if material else None,
+                'display_name': material.display_name if material else None,
+                'material_created_at': material.created_at.isoformat() if material and material.created_at else None,
+            })
+
+        return success_response({'versions': version_payload})
+    except Exception as e:
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/xhs/cards/<int:index>/image-versions/<version_id>/set-current', methods=['POST'])
+def set_xhs_card_current_version(project_id, index: int, version_id: str):
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        version = XhsCardImageVersion.query.get(version_id)
+        if not version or version.project_id != project_id or version.index != index:
+            return not_found('XhsCardImageVersion')
+
+        XhsCardImageVersion.query.filter_by(project_id=project_id, index=index).update({'is_current': False})
+        version.is_current = True
+        db.session.commit()
+
+        material = Material.query.get(version.material_id)
+        if material:
+            role = "cover" if index == 0 else "content"
+            update_xhs_payload_material(project, index, material, role)
+
+        return success_response({'version_id': version.id, 'index': index})
+    except Exception as e:
+        db.session.rollback()
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/generate/xhs/blueprint', methods=['POST'])
+def generate_xhs_blueprint(project_id):
+    """
+    POST /api/projects/{project_id}/generate/xhs/blueprint - Generate XHS copywriting + cards (no images)
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        if project.product_type != 'xiaohongshu':
+            return bad_request("Project is not xiaohongshu type")
+
+        data = request.get_json() or {}
+        language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
+        copywriting_only = bool(data.get('copywriting_only', False))
+
+        pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+        if not pages:
+            return bad_request("No pages found for project")
+
+        image_count = len(pages)
+
+        ai_service = get_ai_service()
+        reference_files_content = _get_project_reference_files_content(project_id)
+        project_context = ProjectContext(project, reference_files_content)
+
+        outline_text = (project.outline_text or "").strip()
+        if not outline_text:
+            titles = []
+            for p in pages:
+                oc = p.get_outline_content() or {}
+                title = (oc.get('title') or '').strip()
+                if title:
+                    titles.append(title)
+            if titles:
+                outline_text = "\n".join([f"{i + 1}. {t}" for i, t in enumerate(titles)])
+
+        blueprint = ai_service.generate_xhs_blueprint(
+            project_context=project_context,
+            outline_text=outline_text,
+            image_count=image_count,
+            aspect_ratio=aspect_ratio,
+            language=language
+        )
+
+        copywriting = blueprint.get("copywriting") if isinstance(blueprint.get("copywriting"), dict) else {}
+        style_pack = blueprint.get("style_pack") if isinstance(blueprint.get("style_pack"), dict) else {}
+        cards = blueprint.get("cards") if isinstance(blueprint.get("cards"), list) else []
+
+        existing_payload = {}
+        if project.product_payload:
+            try:
+                existing_payload = json.loads(project.product_payload)
+            except Exception:
+                existing_payload = {}
+        existing_cards = existing_payload.get("cards") if isinstance(existing_payload.get("cards"), list) else []
+        existing_style_pack = existing_payload.get("style_pack") if isinstance(existing_payload.get("style_pack"), dict) else {}
+
+        # Normalize cards length to pages length
+        normalized_cards = []
+        for i in range(image_count):
+            card = cards[i] if i < len(cards) and isinstance(cards[i], dict) else {}
+            card = dict(card)
+            card["index"] = i
+            card["role"] = (card.get("role") or ("cover" if i == 0 else ("ending" if i == image_count - 1 else "content"))).strip()
+            normalized_cards.append(card)
+
+        def _to_description(card_obj: dict) -> str:
+            heading = (card_obj.get("heading") or "").strip()
+            subheading = (card_obj.get("subheading") or "").strip()
+            bullets = card_obj.get("bullets") if isinstance(card_obj.get("bullets"), list) else []
+            visuals = card_obj.get("visual_suggestions") if isinstance(card_obj.get("visual_suggestions"), list) else []
+            parts = []
+            if heading:
+                parts.append(f"标题：{heading}")
+            if subheading:
+                parts.append(f"副标题：{subheading}")
+            if bullets:
+                parts.append("要点：\n" + "\n".join([f"- {b}" for b in bullets if b]))
+            if visuals:
+                parts.append("画面建议：\n" + "\n".join([f"- {v}" for v in visuals if v]))
+            return "\n".join(parts).strip()
+
+        # Update pages from cards unless only regenerating copywriting
+        if not copywriting_only:
+            for page, card in zip(pages, normalized_cards):
+                heading = (card.get("heading") or "").strip()
+                bullets = card.get("bullets") if isinstance(card.get("bullets"), list) else []
+                role = (card.get("role") or "content").strip().lower()
+                page_type = 'cover' if role == 'cover' else ('ending' if role == 'ending' else 'content')
+
+                if heading or bullets:
+                    page.set_outline_content({
+                        'title': heading or (page.get_outline_content() or {}).get('title', ''),
+                        'points': [b for b in bullets if b] or (page.get_outline_content() or {}).get('points', []),
+                    })
+
+                desc_text = _to_description(card)
+                if desc_text:
+                    page.set_description_content({
+                        "text": desc_text,
+                        "generated_at": datetime.utcnow().isoformat()
+                    })
+                    page.status = 'DESCRIPTION_GENERATED'
+                page.page_type = page_type
+
+        payload = {
+            "product_type": "xiaohongshu",
+            "mode": "vertical_carousel",
+            "aspect_ratio": aspect_ratio,
+            "image_count": image_count,
+            "copywriting": copywriting,
+            "style_pack": style_pack if style_pack else existing_style_pack,
+            "cards": normalized_cards if not copywriting_only else (existing_cards or normalized_cards),
+        }
+        project.product_payload = json.dumps(payload, ensure_ascii=False)
+        if not copywriting_only:
+            project.status = 'DESCRIPTIONS_GENERATED'
+        project.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        return success_response({
+            "project_id": project_id,
+            "pages": [page.to_dict() for page in pages],
+            "product_payload": project.product_payload
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"generate_xhs_blueprint failed: {str(e)}", exc_info=True)
         return error_response('SERVER_ERROR', str(e), 500)
 
 

@@ -5,10 +5,12 @@ import { History } from './pages/History';
 import { OutlineEditor } from './pages/OutlineEditor';
 import { DetailEditor } from './pages/DetailEditor';
 import { SlidePreview } from './pages/SlidePreview';
+import { InfographicPreview } from './pages/InfographicPreview';
+import { XhsPreview } from './pages/XhsPreview';
 import { ProjectMaterials } from './pages/ProjectMaterials';
 import { SettingsPage } from './pages/Settings';
 import { useProjectStore } from './store/useProjectStore';
-import { useToast, GithubLink } from './components/shared';
+import { useToast } from './components/shared';
 
 function App() {
   const { currentProject, syncProject, error, setError } = useProjectStore();
@@ -39,11 +41,12 @@ function App() {
         <Route path="/project/:projectId/outline" element={<OutlineEditor />} />
         <Route path="/project/:projectId/detail" element={<DetailEditor />} />
         <Route path="/project/:projectId/preview" element={<SlidePreview />} />
+        <Route path="/project/:projectId/infographic" element={<InfographicPreview />} />
+        <Route path="/project/:projectId/xhs" element={<XhsPreview />} />
         <Route path="/project/:projectId/materials" element={<ProjectMaterials />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <ToastContainer />
-      <GithubLink />
     </BrowserRouter>
   );
 }

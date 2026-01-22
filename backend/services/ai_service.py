@@ -22,7 +22,11 @@ from .prompts import (
     get_description_to_outline_prompt,
     get_description_split_prompt,
     get_outline_refinement_prompt,
-    get_descriptions_refinement_prompt
+    get_descriptions_refinement_prompt,
+    get_infographic_blueprint_prompt,
+    get_infographic_image_prompt,
+    get_xhs_blueprint_prompt,
+    get_xhs_image_prompt
 )
 from .ai_providers import get_text_provider, get_image_provider, TextProvider, ImageProvider
 from config import get_config
@@ -46,12 +50,18 @@ class ProjectContext:
             self.outline_text = project_or_dict.outline_text
             self.description_text = project_or_dict.description_text
             self.creation_type = project_or_dict.creation_type or 'idea'
+            self.product_type = project_or_dict.product_type or 'ppt'
+            self.extra_requirements = project_or_dict.extra_requirements
+            self.template_style = project_or_dict.template_style
         else:
             # 是字典
             self.idea_prompt = project_or_dict.get('idea_prompt')
             self.outline_text = project_or_dict.get('outline_text')
             self.description_text = project_or_dict.get('description_text')
             self.creation_type = project_or_dict.get('creation_type', 'idea')
+            self.product_type = project_or_dict.get('product_type', 'ppt')
+            self.extra_requirements = project_or_dict.get('extra_requirements')
+            self.template_style = project_or_dict.get('template_style')
         
         self.reference_files_content = reference_files_content or []
     
@@ -62,6 +72,9 @@ class ProjectContext:
             'outline_text': self.outline_text,
             'description_text': self.description_text,
             'creation_type': self.creation_type,
+            'product_type': self.product_type,
+            'extra_requirements': self.extra_requirements,
+            'template_style': self.template_style,
             'reference_files_content': self.reference_files_content
         }
 
@@ -388,6 +401,7 @@ class AIService:
     def generate_template_style(self, project_context: ProjectContext,
                                 outline_text: str = "",
                                 extra_requirements: Optional[str] = None,
+                                existing_template_style: Optional[str] = None,
                                 language: str = None) -> str:
         """
         Generate a deck-level style description for project.template_style
@@ -405,6 +419,7 @@ class AIService:
             project_context=project_context,
             outline_text=outline_text,
             extra_requirements=extra_requirements,
+            existing_template_style=existing_template_style,
             language=language
         )
         actual_budget = self._get_text_thinking_budget()
@@ -474,6 +489,96 @@ class AIService:
         )
         
         return prompt
+
+    def generate_infographic_blueprint(self,
+                                       project_context: ProjectContext,
+                                       outline_text: str = "",
+                                       page_title: str = "",
+                                       page_desc: str = "",
+                                       mode: str = "single",
+                                       extra_requirements: str = "",
+                                       template_style: str = "",
+                                       language: str = None) -> str:
+        """
+        Generate infographic blueprint text to compress content before image generation.
+        """
+        cleaned_page_desc = self.remove_markdown_images(page_desc or "")
+        blueprint_prompt = get_infographic_blueprint_prompt(
+            project_context=project_context,
+            outline_text=outline_text,
+            page_title=page_title,
+            page_desc=cleaned_page_desc,
+            mode=mode,
+            extra_requirements=extra_requirements,
+            template_style=template_style,
+            language=language
+        )
+        actual_budget = self._get_text_thinking_budget()
+        response_text = self.text_provider.generate_text(blueprint_prompt, thinking_budget=actual_budget)
+        return dedent(response_text).strip()
+
+    def generate_infographic_image_prompt(self,
+                                          blueprint: str,
+                                          mode: str = "single",
+                                          page_title: str = "",
+                                          extra_requirements: str = "",
+                                          template_style: str = "",
+                                          aspect_ratio: str = "",
+                                          language: str = None) -> str:
+        """
+        Generate infographic image prompt (non-PPT style).
+        """
+        return get_infographic_image_prompt(
+            blueprint=blueprint,
+            mode=mode,
+            page_title=page_title,
+            extra_requirements=extra_requirements,
+            template_style=template_style,
+            aspect_ratio=aspect_ratio,
+            language=language
+        )
+
+    def generate_xhs_blueprint(
+        self,
+        project_context: ProjectContext,
+        outline_text: str = "",
+        image_count: int = 7,
+        aspect_ratio: str = "4:5",
+        language: str = None
+    ) -> Dict:
+        """
+        Generate Xiaohongshu (vertical carousel) blueprint JSON.
+        """
+        prompt = get_xhs_blueprint_prompt(
+            project_context=project_context,
+            outline_text=outline_text,
+            image_count=image_count,
+            aspect_ratio=aspect_ratio,
+            language=language
+        )
+        blueprint = self.generate_json(prompt, thinking_budget=1000)
+        if not isinstance(blueprint, dict):
+            raise ValueError("XHS blueprint must be a JSON object")
+        return blueprint
+
+    def generate_xhs_image_prompt(
+        self,
+        card: Dict,
+        style_pack: Dict,
+        aspect_ratio: str = "4:5",
+        total: int = 7,
+        language: str = None
+    ) -> str:
+        """
+        Generate image prompt for a single XHS card.
+        """
+        return get_xhs_image_prompt(
+            card=card,
+            style_pack=style_pack,
+            aspect_ratio=aspect_ratio,
+            total=total,
+            language=language
+        )
     
     def generate_image(self, prompt: str, ref_image_path: Optional[str] = None, 
                       aspect_ratio: str = "16:9", resolution: str = "2K",

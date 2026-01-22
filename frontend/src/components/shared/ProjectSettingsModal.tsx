@@ -162,13 +162,13 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                   <div>
                     <h4 className="text-base font-semibold text-gray-900 mb-2">额外要求</h4>
                     <p className="text-sm text-gray-600">
-                      在生成每个页面时，AI 会参考这些额外要求
+                      在生成内容时，AI 会参考这些额外要求
                     </p>
                   </div>
                   <Textarea
                     value={extraRequirements}
                     onChange={(e) => onExtraRequirementsChange(e.target.value)}
-                    placeholder="例如：使用紧凑的布局，顶部展示一级大纲标题，加入更丰富的PPT插图..."
+                    placeholder="例如：使用紧凑的布局，强调数据可视化，加入更丰富的插图或图表..."
                     rows={4}
                     className="text-sm"
                   />
@@ -188,7 +188,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                   <div>
                     <h4 className="text-base font-semibold text-gray-900 mb-2">风格描述</h4>
                     <p className="text-sm text-gray-600">
-                      描述您期望的 PPT 整体风格，AI 将根据描述生成相应风格的页面
+                      描述您期望的整体风格，AI 将根据描述生成相应风格的内容
                     </p>
                   </div>
                   <Textarea

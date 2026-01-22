@@ -1,10 +1,11 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, ImagePlus } from 'lucide-react';
 import { Button, Loading, useToast, useConfirm, AiRefineInput, FilePreviewModal, ProjectResourcesList, Modal, Textarea } from '@/components/shared';
 import { DescriptionCard } from '@/components/preview/DescriptionCard';
 import { useProjectStore } from '@/store/useProjectStore';
-import { refineDescriptions } from '@/api/endpoints';
+import type { Page } from '@/types';
+import { refineDescriptions, updateProject, generateXhsBlueprint } from '@/api/endpoints';
 import { exportDescriptionsToMarkdown } from '@/utils/projectUtils';
 
 export const DetailEditor: React.FC = () => {
@@ -19,6 +20,7 @@ export const DetailEditor: React.FC = () => {
     generateDescriptions,
     generatePageDescription,
     pageDescriptionGeneratingTasks,
+    taskProgress,
   } = useProjectStore();
   const { show, ToastContainer } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -28,6 +30,27 @@ export const DetailEditor: React.FC = () => {
   const [regenerateTargetPageId, setRegenerateTargetPageId] = useState<string | null>(null);
   const [regenerateExtraPrompt, setRegenerateExtraPrompt] = useState('');
   const [isSubmittingRegenerate, setIsSubmittingRegenerate] = useState(false);
+  const [xhsTitle, setXhsTitle] = useState('');
+  const [xhsBody, setXhsBody] = useState('');
+  const [xhsHashtags, setXhsHashtags] = useState('');
+  const [isSavingXhsCopywriting, setIsSavingXhsCopywriting] = useState(false);
+  const [isGeneratingXhsBlueprint, setIsGeneratingXhsBlueprint] = useState(false);
+
+  const isXhsProject = currentProject?.product_type === 'xiaohongshu';
+  const isInfographicProject = currentProject?.product_type === 'infographic';
+  const isBatchGeneratingDescriptions = useMemo(
+    () => Object.keys(pageDescriptionGeneratingTasks || {}).length > 0,
+    [pageDescriptionGeneratingTasks]
+  );
+
+  const xhsPayload = useMemo(() => {
+    if (!currentProject?.product_payload) return null;
+    try {
+      return JSON.parse(currentProject.product_payload);
+    } catch {
+      return null;
+    }
+  }, [currentProject?.product_payload]);
 
   // 加载项目数据
   useEffect(() => {
@@ -37,23 +60,45 @@ export const DetailEditor: React.FC = () => {
     } else if (projectId && currentProject && currentProject.id === projectId) {
       // 如果项目已存在，也同步一次以确保数据是最新的（特别是从描述生成后）
       // 但只在首次加载时同步，避免频繁请求
-      const shouldSync = !currentProject.pages.some(p => p.description_content);
+      const shouldSync = !currentProject.pages.some((p: Page) => p.description_content);
       if (shouldSync) {
         syncProject(projectId);
       }
     }
   }, [projectId, currentProject?.id]); // 只在 projectId 或项目ID变化时更新
 
+  useEffect(() => {
+    if (!isXhsProject) return;
+    const copywriting = xhsPayload?.copywriting || {};
+    const title = (copywriting.title || '').trim();
+    const body = (copywriting.body || '').trim();
+    const hashtagsArray = Array.isArray(copywriting.hashtags) ? copywriting.hashtags : [];
+    const hashtags = hashtagsArray.filter(Boolean).join(' ');
+    setXhsTitle(title);
+    setXhsBody(body);
+    setXhsHashtags(hashtags);
+  }, [isXhsProject, xhsPayload]);
+
 
   const handleGenerateAll = async () => {
     const hasDescriptions = currentProject?.pages.some(
-      (p) => p.description_content
+      (p: Page) => p.description_content
     );
-    
+
     const executeGenerate = async () => {
-      await generateDescriptions();
+      try {
+        if (isXhsProject && currentProject?.id) {
+          // 复用带 loading 状态的实现，避免“没反应”的误判
+          await handleGenerateXhsBlueprint(false);
+          return;
+        }
+        await generateDescriptions();
+        show({ message: '已开始批量生成描述，请稍候…', type: 'info' });
+      } catch (error: any) {
+        show({ message: error?.message || '生成失败', type: 'error' });
+      }
     };
-    
+
     if (hasDescriptions) {
       confirm(
         '部分页面已有描述，重新生成将覆盖，确定继续吗？',
@@ -62,6 +107,51 @@ export const DetailEditor: React.FC = () => {
       );
     } else {
       await executeGenerate();
+    }
+  };
+
+  const handleSaveXhsCopywriting = async () => {
+    if (!currentProject || !currentProject.id) return;
+    setIsSavingXhsCopywriting(true);
+    try {
+      const existingPayload = xhsPayload && typeof xhsPayload === 'object' ? xhsPayload : {};
+      const hashtags = xhsHashtags
+        .split(/\s+/)
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+      const nextPayload = {
+        ...existingPayload,
+        product_type: 'xiaohongshu',
+        copywriting: {
+          ...(existingPayload.copywriting || {}),
+          title: xhsTitle.trim(),
+          body: xhsBody.trim(),
+          hashtags,
+        },
+      };
+      await updateProject(currentProject.id, {
+        product_payload: JSON.stringify(nextPayload),
+      });
+      await syncProject(currentProject.id);
+      show({ message: '文案已保存', type: 'success' });
+    } catch (error: any) {
+      show({ message: `保存失败: ${error.message || '未知错误'}`, type: 'error' });
+    } finally {
+      setIsSavingXhsCopywriting(false);
+    }
+  };
+
+  const handleGenerateXhsBlueprint = async (copywritingOnly: boolean = false) => {
+    if (!currentProject || !currentProject.id || isGeneratingXhsBlueprint) return;
+    setIsGeneratingXhsBlueprint(true);
+    try {
+      await generateXhsBlueprint(currentProject.id, { copywritingOnly });
+      await syncProject(currentProject.id);
+      show({ message: copywritingOnly ? '已重新生成文案' : '已生成文案与卡片内容', type: 'success' });
+    } catch (error: any) {
+      show({ message: error.message || '生成失败', type: 'error' });
+    } finally {
+      setIsGeneratingXhsBlueprint(false);
     }
   };
 
@@ -78,7 +168,7 @@ export const DetailEditor: React.FC = () => {
       return;
     }
     
-    const page = currentProject.pages.find((p) => p.id === pageId);
+    const page = currentProject.pages.find((p: Page) => p.id === pageId);
     if (!page) return;
     
     // 如果已有描述，询问是否覆盖
@@ -144,8 +234,11 @@ export const DetailEditor: React.FC = () => {
   }
 
   const hasAllDescriptions = currentProject.pages.every(
-    (p) => p.description_content
+    (p: Page) => p.description_content
   );
+
+  const isPptProject = !isXhsProject && !isInfographicProject;
+  const canProceedToPreview = isPptProject ? hasAllDescriptions : currentProject.pages.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -213,11 +306,21 @@ export const DetailEditor: React.FC = () => {
               variant="primary"
               size="sm"
               icon={<ArrowRight size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={() => navigate(`/project/${projectId}/preview`)}
-              disabled={!hasAllDescriptions}
+              onClick={() => {
+                if (isXhsProject) {
+                  navigate(`/project/${projectId}/xhs`);
+                  return;
+                }
+                if (isInfographicProject) {
+                  navigate(`/project/${projectId}/infographic`);
+                  return;
+                }
+                navigate(`/project/${projectId}/preview`);
+              }}
+              disabled={!canProceedToPreview}
               className="text-xs md:text-sm"
             >
-              <span className="hidden sm:inline">生成图片</span>
+              <span className="hidden sm:inline">{isPptProject ? '生成图片' : '进入预览'}</span>
             </Button>
           </div>
         </div>
@@ -244,29 +347,125 @@ export const DetailEditor: React.FC = () => {
               icon={<Sparkles size={16} className="md:w-[18px] md:h-[18px]" />}
               onClick={handleGenerateAll}
               className="flex-1 sm:flex-initial text-sm md:text-base"
+              disabled={isBatchGeneratingDescriptions || isGeneratingXhsBlueprint}
             >
-              批量生成描述
+              {isBatchGeneratingDescriptions || isGeneratingXhsBlueprint ? '生成中...' : '批量生成描述'}
             </Button>
             <Button
               variant="secondary"
               icon={<Download size={16} className="md:w-[18px] md:h-[18px]" />}
               onClick={handleExportDescriptions}
-              disabled={!currentProject.pages.some(p => p.description_content)}
+              disabled={!currentProject.pages.some((p: Page) => p.description_content)}
               className="flex-1 sm:flex-initial text-sm md:text-base"
             >
               导出描述
             </Button>
             <span className="text-xs md:text-sm text-gray-500 whitespace-nowrap">
-              {currentProject.pages.filter((p) => p.description_content).length} /{' '}
+              {currentProject.pages.filter((p: Page) => p.description_content).length} /{' '}
               {currentProject.pages.length} 页已完成
             </span>
           </div>
         </div>
+        {(isBatchGeneratingDescriptions || isGeneratingXhsBlueprint) && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex w-2 h-2 rounded-full bg-banana-500 animate-pulse" />
+                <span>
+                  {isXhsProject
+                    ? '正在生成小红书文案/卡片蓝图…'
+                    : '正在批量生成页面描述…'}
+                </span>
+              </div>
+              {!isXhsProject && (
+                <span className="tabular-nums">
+                  {Math.min(
+                    Number((taskProgress as any)?.completed ?? 0),
+                    Number((taskProgress as any)?.total ?? currentProject.pages.length)
+                  )}{' '}
+                  / {Number((taskProgress as any)?.total ?? currentProject.pages.length)}
+                </span>
+              )}
+            </div>
+            {!isXhsProject && (
+              <div className="mt-2 h-2 bg-gray-100 rounded overflow-hidden">
+                <div
+                  className="h-full bg-banana-500 transition-all"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round(
+                        (Number((taskProgress as any)?.completed ?? 0) /
+                          Math.max(1, Number((taskProgress as any)?.total ?? currentProject.pages.length))) *
+                          100
+                      )
+                    )}%`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 主内容区 */}
       <main className="flex-1 p-3 md:p-6 overflow-y-auto min-h-0">
         <div className="max-w-7xl mx-auto">
+          {isXhsProject && (
+            <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-5 shadow-sm mb-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div className="text-sm font-semibold text-gray-800">标题与正文</div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleGenerateXhsBlueprint(true)}
+                    disabled={isGeneratingXhsBlueprint}
+                  >
+                    {isGeneratingXhsBlueprint ? '生成中...' : '重新生成文案'}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveXhsCopywriting}
+                    disabled={isSavingXhsCopywriting}
+                  >
+                    {isSavingXhsCopywriting ? '保存中...' : '保存文案'}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">标题</label>
+                  <input
+                    value={xhsTitle}
+                    onChange={(e) => setXhsTitle(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-banana-400"
+                    placeholder="请输入标题"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">正文</label>
+                  <Textarea
+                    value={xhsBody}
+                    onChange={(e) => setXhsBody(e.target.value)}
+                    rows={5}
+                    className="text-sm"
+                    placeholder="请输入正文内容"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">话题（空格分隔）</label>
+                  <input
+                    value={xhsHashtags}
+                    onChange={(e) => setXhsHashtags(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-banana-400"
+                    placeholder="例如：#旅行 #攻略 #打卡"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           {/* 项目资源列表（文件和图片） */}
           <ProjectResourcesList
             projectId={projectId || null}
@@ -294,7 +493,7 @@ export const DetailEditor: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-              {currentProject.pages.map((page, index) => {
+              {currentProject.pages.map((page: Page, index: number) => {
                 const pageId = page.id || page.page_id;
                 return (
                   <DescriptionCard

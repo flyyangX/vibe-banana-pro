@@ -496,6 +496,19 @@ def upload_user_template():
 
         # Get optional name
         name = request.form.get('name', None)
+        raw_tags = request.form.get('product_tags') or request.form.get('product_tag') or ''
+        product_tags = []
+        if raw_tags:
+            try:
+                parsed = json.loads(raw_tags)
+                if isinstance(parsed, list):
+                    product_tags = [str(tag).strip() for tag in parsed if str(tag).strip()]
+                elif isinstance(parsed, str):
+                    product_tags = [t.strip() for t in parsed.split(',') if t.strip()]
+            except Exception:
+                product_tags = [t.strip() for t in raw_tags.split(',') if t.strip()]
+        if not product_tags:
+            product_tags = ["universal"]
 
         # Get file size before saving
         file.seek(0, 2)  # Seek to end
@@ -519,7 +532,8 @@ def upload_user_template():
             name=name,
             file_path=file_path,
             thumb_path=thumb_path,
-            file_size=file_size
+            file_size=file_size,
+            product_tags=json.dumps(product_tags, ensure_ascii=False)
         )
         db.session.add(template)
         db.session.commit()
@@ -544,7 +558,10 @@ def list_user_templates():
     GET /api/user-templates - Get list of user templates
     """
     try:
+        filter_tag = (request.args.get('product_tag') or '').strip()
         templates = UserTemplate.query.order_by(UserTemplate.created_at.desc()).all()
+        if filter_tag:
+            templates = [t for t in templates if filter_tag in (t.get_product_tags() or [])]
         
         return success_response({
             'templates': [template.to_dict() for template in templates]

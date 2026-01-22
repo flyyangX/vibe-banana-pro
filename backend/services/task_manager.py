@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List, Dict, Any
 from datetime import datetime
 from sqlalchemy import func
-from models import db, Task, Page, Project, Material, PageImageVersion
+from models import db, Task, Page, Project, Material, PageImageVersion, XhsCardImageVersion, ReferenceFile
+from services import ProjectContext
 from utils import get_filtered_pages
 from pathlib import Path
 
@@ -115,6 +116,26 @@ def _parse_template_sets(project: Project) -> Dict[str, Dict[str, Any]]:
         except json.JSONDecodeError:
             return {}
     return {}
+
+
+def _get_project_reference_files_content(project_id: str) -> List[Dict[str, str]]:
+    """
+    Get reference files content for a project (completed only).
+    """
+    reference_files = ReferenceFile.query.filter_by(
+        project_id=project_id,
+        parse_status='completed'
+    ).all()
+
+    files_content = []
+    for ref_file in reference_files:
+        if ref_file.markdown_content:
+            files_content.append({
+                'filename': ref_file.filename,
+                'content': ref_file.markdown_content
+            })
+
+    return files_content
 
 
 def _append_template_variant_history(active_set: Dict[str, Any], variant_type: str, relative_path: str,
@@ -223,6 +244,931 @@ def save_image_with_version(image, project_id: str, page_id: str, file_service,
     logger.debug(f"Page {page_id} image saved as version {next_version}: {image_path}, cached: {cached_image_path}")
 
     return image_path, next_version
+
+
+def save_xhs_card_version(project_id: str, card_index: int, material_id: str) -> XhsCardImageVersion:
+    """
+    保存小红书卡片版本，并标记为当前版本。
+    """
+    max_version = db.session.query(func.max(XhsCardImageVersion.version_number))\
+        .filter_by(project_id=project_id, index=card_index).scalar() or 0
+    next_version = max_version + 1
+    XhsCardImageVersion.query.filter_by(project_id=project_id, index=card_index)\
+        .update({'is_current': False})
+    version = XhsCardImageVersion(
+        project_id=project_id,
+        index=card_index,
+        material_id=material_id,
+        version_number=next_version,
+        is_current=True
+    )
+    db.session.add(version)
+    db.session.commit()
+    return version
+
+
+def get_current_xhs_material(project_id: str, card_index: int) -> Material | None:
+    """
+    获取小红书卡片当前版本对应的素材，如果没有则取最新素材。
+    """
+    version = XhsCardImageVersion.query.filter_by(
+        project_id=project_id,
+        index=card_index,
+        is_current=True
+    ).order_by(XhsCardImageVersion.version_number.desc()).first()
+    if version:
+        material = Material.query.get(version.material_id)
+        if material:
+            return material
+    materials = Material.query.filter_by(project_id=project_id).all()
+    candidates = []
+    for m in materials:
+        try:
+            note = json.loads(m.note or '{}')
+        except Exception:
+            note = {}
+        if note.get('type') == 'xhs' and note.get('mode') == 'vertical_carousel' and int(note.get('index', -1)) == card_index:
+            candidates.append(m)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda m: m.created_at or datetime.min, reverse=True)
+    return candidates[0]
+
+
+def update_xhs_payload_material(project: Project, card_index: int, material: Material, role: str):
+    payload = {}
+    if project.product_payload:
+        try:
+            payload = json.loads(project.product_payload)
+        except Exception:
+            payload = {}
+    materials_payload = payload.get("materials") if isinstance(payload.get("materials"), list) else []
+    materials_payload = [m for m in materials_payload if int(m.get("index", -1) or -1) != card_index]
+    materials_payload.append({
+        "index": card_index,
+        "material_id": material.id,
+        "url": material.url,
+        "display_name": material.display_name,
+        "role": role,
+    })
+    payload["materials"] = sorted(materials_payload, key=lambda x: int(x.get("index", 0) or 0))
+    project.product_payload = json.dumps(payload, ensure_ascii=False)
+    project.updated_at = datetime.utcnow()
+    db.session.commit()
+
+
+def generate_infographic_task(task_id: str, project_id: str, ai_service, file_service,
+                              outline: List[Dict], mode: str = "single",
+                              max_workers: int = 6, aspect_ratio: str = "9:16",
+                              resolution: str = "2K", app=None,
+                              language: str = None, page_ids: list = None,
+                              use_template: bool = True):
+    """
+    Background task for generating infographic images (single or series).
+    Saves results as Material records bound to the project.
+    """
+    if app is None:
+        raise ValueError("Flask app instance must be provided")
+
+    mode = (mode or "single").strip().lower()
+    if mode not in ("single", "series"):
+        mode = "single"
+
+    with app.app_context():
+        try:
+            task = Task.query.get(task_id)
+            if not task:
+                return
+
+            task.status = 'PROCESSING'
+            db.session.commit()
+
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+
+            pages = get_filtered_pages(project_id, page_ids)
+            if mode == "series" and not pages:
+                raise ValueError("No pages found for project")
+
+            reference_files_content = _get_project_reference_files_content(project_id)
+            project_context = ProjectContext(project, reference_files_content)
+            outline_text = project.outline_text or ai_service.generate_outline_text(outline)
+
+            template_ref_path = file_service.get_template_path(project_id) if use_template else None
+            extra_requirements = (project.extra_requirements or "").strip()
+            template_style = (project.template_style or "").strip()
+
+            if mode == "single":
+                task.set_progress({"total": 1, "completed": 0, "failed": 0})
+                db.session.commit()
+
+                ref_images = []
+                if project.description_text:
+                    ref_images = ai_service.extract_image_urls_from_markdown(project.description_text)
+
+                blueprint = ai_service.generate_infographic_blueprint(
+                    project_context=project_context,
+                    outline_text=outline_text,
+                    page_title=None,
+                    page_desc=None,
+                    mode=mode,
+                    extra_requirements=extra_requirements,
+                    template_style=template_style,
+                    language=language
+                )
+                prompt = ai_service.generate_infographic_image_prompt(
+                    blueprint=blueprint,
+                    mode=mode,
+                    page_title=None,
+                    extra_requirements=extra_requirements,
+                    template_style=template_style,
+                    aspect_ratio=aspect_ratio,
+                    language=language
+                )
+
+                image = ai_service.generate_image(
+                    prompt=prompt,
+                    ref_image_path=template_ref_path,
+                    additional_ref_images=ref_images or None,
+                    aspect_ratio=aspect_ratio,
+                    resolution=resolution
+                )
+
+                if not image:
+                    raise ValueError("Failed to generate infographic image")
+
+                relative_path = file_service.save_material_image(image, project_id)
+                relative = Path(relative_path)
+                filename = relative.name
+                image_url = file_service.get_file_url(project_id, 'materials', filename)
+
+                note = json.dumps({
+                    "type": "infographic",
+                    "mode": "single",
+                    "source": "project",
+                    "page_id": None
+                }, ensure_ascii=False)
+
+                material = Material(
+                    project_id=project_id,
+                    filename=filename,
+                    relative_path=relative_path,
+                    url=image_url,
+                    note=note
+                )
+                db.session.add(material)
+                db.session.commit()
+
+                task.status = 'COMPLETED'
+                task.completed_at = datetime.utcnow()
+                task.set_progress({
+                    "total": 1,
+                    "completed": 1,
+                    "failed": 0,
+                    "material_id": material.id,
+                    "image_url": image_url
+                })
+                db.session.commit()
+                project.status = 'COMPLETED'
+                project.updated_at = datetime.utcnow()
+                db.session.commit()
+                return
+
+            # series mode
+            task.set_progress({"total": len(pages), "completed": 0, "failed": 0})
+            db.session.commit()
+
+            completed = 0
+            failed = 0
+
+            def _get_page_desc(page_obj: Page) -> str:
+                desc_content = page_obj.get_description_content() or {}
+                desc_text = desc_content.get('text', '')
+                if not desc_text and desc_content.get('text_content'):
+                    text_content = desc_content.get('text_content', [])
+                    if isinstance(text_content, list):
+                        desc_text = '\n'.join(text_content)
+                    else:
+                        desc_text = str(text_content)
+                if not desc_text:
+                    outline_content = page_obj.get_outline_content() or {}
+                    points = outline_content.get('points') or []
+                    if isinstance(points, list):
+                        points_text = "\n".join([str(p) for p in points if p])
+                    else:
+                        points_text = str(points or "")
+                    title = outline_content.get('title') or ''
+                    desc_text = "\n".join([t for t in [title, points_text] if t])
+                return desc_text
+
+            def generate_single_infographic(page_id: str):
+                with app.app_context():
+                    try:
+                        page_obj = Page.query.get(page_id)
+                        if not page_obj:
+                            raise ValueError(f"Page {page_id} not found")
+
+                        page_desc = _get_page_desc(page_obj)
+                        ref_images = ai_service.extract_image_urls_from_markdown(page_desc or "")
+                        outline_content = page_obj.get_outline_content() or {}
+                        page_title = outline_content.get('title') or ''
+
+                        blueprint = ai_service.generate_infographic_blueprint(
+                            project_context=project_context,
+                            outline_text=outline_text,
+                            page_title=page_title,
+                            page_desc=page_desc,
+                            mode=mode,
+                            extra_requirements=extra_requirements,
+                            template_style=template_style,
+                            language=language
+                        )
+                        prompt = ai_service.generate_infographic_image_prompt(
+                            blueprint=blueprint,
+                            mode=mode,
+                            page_title=page_title,
+                            extra_requirements=extra_requirements,
+                            template_style=template_style,
+                            aspect_ratio=aspect_ratio,
+                            language=language
+                        )
+
+                        image = ai_service.generate_image(
+                            prompt=prompt,
+                            ref_image_path=template_ref_path,
+                            additional_ref_images=ref_images or None,
+                            aspect_ratio=aspect_ratio,
+                            resolution=resolution
+                        )
+
+                        if not image:
+                            raise ValueError("Failed to generate infographic image")
+
+                        relative_path = file_service.save_material_image(image, project_id)
+                        relative = Path(relative_path)
+                        filename = relative.name
+                        image_url = file_service.get_file_url(project_id, 'materials', filename)
+
+                        note = json.dumps({
+                            "type": "infographic",
+                            "mode": "series",
+                            "source": "page",
+                            "page_id": page_id,
+                            "order_index": page_obj.order_index
+                        }, ensure_ascii=False)
+
+                        material = Material(
+                            project_id=project_id,
+                            filename=filename,
+                            relative_path=relative_path,
+                            url=image_url,
+                            note=note
+                        )
+                        db.session.add(material)
+                        db.session.commit()
+                        return (page_id, image_url, None)
+
+                    except Exception as e:
+                        import traceback
+                        logger.error(f"Failed to generate infographic for page {page_id}: {traceback.format_exc()}")
+                        return (page_id, None, str(e))
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(generate_single_infographic, page.id)
+                    for page in pages
+                    if page and page.id
+                ]
+
+                for future in as_completed(futures):
+                    _, _, error = future.result()
+                    if error:
+                        failed += 1
+                    else:
+                        completed += 1
+
+                    task = Task.query.get(task_id)
+                    if task:
+                        task.update_progress(completed=completed, failed=failed)
+                        db.session.commit()
+
+            task = Task.query.get(task_id)
+            if task:
+                task.status = 'COMPLETED'
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+            project = Project.query.get(project_id)
+            if project:
+                project.status = 'COMPLETED'
+                project.updated_at = datetime.utcnow()
+                db.session.commit()
+
+        except Exception as e:
+            task = Task.query.get(task_id)
+            if task:
+                task.status = 'FAILED'
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+
+
+def generate_xhs_task(
+    task_id: str,
+    project_id: str,
+    ai_service,
+    file_service,
+    image_count: int = 7,
+    aspect_ratio: str = "3:4",
+    resolution: str = "2K",
+    max_workers: int = 6,
+    use_template: bool = None,
+    app=None,
+    language: str = None
+):
+    """
+    Background task for generating Xiaohongshu image+text pack (vertical carousel).
+
+    - Generates a JSON blueprint (copywriting + cards + style_pack)
+    - Generates N vertical images (cover + content cards)
+    - Saves images as Material records and stores structured payload into Project.product_payload
+    """
+    if app is None:
+        raise ValueError("Flask app instance must be provided")
+
+    with app.app_context():
+        try:
+            task = Task.query.get(task_id)
+            if not task:
+                return
+
+            task.status = 'PROCESSING'
+            db.session.commit()
+
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+            resolved_use_template = use_template
+            if resolved_use_template is None:
+                resolved_use_template = bool(project.template_image_path or project.get_template_variants())
+
+            pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+
+            # Normalize params (prefer pages length if available)
+            if pages:
+                total = len(pages)
+            else:
+                try:
+                    total = int(image_count or 7)
+                except Exception:
+                    total = 7
+            if total < 1:
+                raise ValueError("XHS pages count must be greater than 0")
+            aspect_ratio = (aspect_ratio or "4:5").strip()
+            resolution = (resolution or "2K").strip()
+            try:
+                max_workers = int(max_workers or 6)
+            except Exception:
+                max_workers = 6
+            max_workers = min(16, max(1, max_workers))
+            max_workers = min(max_workers, total)
+
+            task.set_progress({"total": total, "completed": 0, "failed": 0})
+            db.session.commit()
+
+            reference_files_content = _get_project_reference_files_content(project_id)
+            project_context = ProjectContext(project, reference_files_content)
+
+            # Build outline_text fallback (if user didn't provide outline_text)
+            outline_text = (project.outline_text or "").strip()
+            if not outline_text:
+                titles = []
+                for p in pages:
+                    oc = p.get_outline_content() or {}
+                    t = (oc.get('title') or '').strip()
+                    if t:
+                        titles.append(t)
+                if titles:
+                    outline_text = "\n".join([f"{i+1}. {t}" for i, t in enumerate(titles)])
+
+            payload = {}
+            if project.product_payload:
+                try:
+                    payload = json.loads(project.product_payload)
+                except Exception:
+                    payload = {}
+
+            copywriting = payload.get("copywriting") if isinstance(payload.get("copywriting"), dict) else {}
+            style_pack = payload.get("style_pack") if isinstance(payload.get("style_pack"), dict) else {}
+            payload_cards = payload.get("cards") if isinstance(payload.get("cards"), list) else []
+
+            if not copywriting or not style_pack:
+                blueprint = ai_service.generate_xhs_blueprint(
+                    project_context=project_context,
+                    outline_text=outline_text,
+                    image_count=total,
+                    aspect_ratio=aspect_ratio,
+                    language=language
+                )
+                if not copywriting:
+                    copywriting = blueprint.get("copywriting") if isinstance(blueprint.get("copywriting"), dict) else {}
+                if not style_pack:
+                    style_pack = blueprint.get("style_pack") if isinstance(blueprint.get("style_pack"), dict) else {}
+
+            if project.template_style:
+                style_pack = dict(style_pack or {})
+                style_pack["template_style"] = project.template_style
+            if project.extra_requirements:
+                style_pack = dict(style_pack or {})
+                style_pack["extra_requirements"] = project.extra_requirements
+
+            # Normalize cards (prefer pages + description edits)
+            normalized_cards: List[Dict[str, Any]] = []
+            if pages:
+                page_ids = [p.id for p in pages]
+                for i, page in enumerate(pages):
+                    oc = page.get_outline_content() or {}
+                    heading = (oc.get("title") or "").strip()
+                    bullets = oc.get("points") if isinstance(oc.get("points"), list) else []
+                    desc_content = page.get_description_content() or {}
+                    desc_text = desc_content.get("text") or ""
+                    if not desc_text and desc_content.get("text_content"):
+                        text_content = desc_content.get("text_content", [])
+                        if isinstance(text_content, list):
+                            desc_text = "\n".join(text_content)
+                        else:
+                            desc_text = str(text_content)
+                    clean_desc = ai_service.remove_markdown_images(desc_text or "")
+                    desc_lines = [line.strip() for line in clean_desc.splitlines() if line.strip()]
+
+                    base_card = payload_cards[i] if i < len(payload_cards) and isinstance(payload_cards[i], dict) else {}
+                    card = dict(base_card)
+                    inferred_role = infer_page_type(page, total)
+                    role = inferred_role if inferred_role in ["cover", "content", "ending"] else "content"
+                    if not bullets and desc_lines:
+                        bullets = desc_lines[:6]
+
+                    card.update({
+                        "index": i,
+                        "role": role,
+                        "heading": heading or card.get("heading", ""),
+                        "subheading": card.get("subheading", ""),
+                        "bullets": bullets or card.get("bullets", []) or [],
+                        "visual_suggestions": card.get("visual_suggestions", []) or [],
+                        "ref_images": ai_service.extract_image_urls_from_markdown(desc_text or ""),
+                    })
+                    # 兜底：描述里没有 bullets 时，用描述文本作为视觉建议
+                    if not card.get("visual_suggestions") and desc_lines:
+                        card["visual_suggestions"] = desc_lines[:4]
+                    normalized_cards.append(card)
+            else:
+                page_ids = []
+                for i in range(total):
+                    c = payload_cards[i] if i < len(payload_cards) and isinstance(payload_cards[i], dict) else {}
+                    c = dict(c)
+                    c["index"] = i
+                    c["role"] = (c.get("role") or ("cover" if i == 0 else "content")).strip()
+                    normalized_cards.append(c)
+                while len(normalized_cards) < total:
+                    i = len(normalized_cards)
+                    normalized_cards.append(
+                        {
+                            "index": i,
+                            "role": "cover" if i == 0 else "content",
+                            "heading": "封面" if i == 0 else f"要点 {i}",
+                            "subheading": "",
+                            "bullets": [],
+                            "visual_suggestions": [],
+                            "ref_images": [],
+                        }
+                    )
+
+            completed = 0
+            failed = 0
+            results: List[Dict[str, Any]] = []
+
+            def _generate_one(card: Dict[str, Any]) -> Dict[str, Any]:
+                with app.app_context():
+                    idx = int(card.get("index", 0) or 0)
+                    try:
+                        template_ref_path = None
+                        page_obj = None
+                        if page_ids and idx < len(page_ids):
+                            page_obj = Page.query.get(page_ids[idx])
+                        if resolved_use_template and page_obj:
+                            template_ref_path = pick_template_for_page(project, page_obj, total, file_service)
+                        prompt = ai_service.generate_xhs_image_prompt(
+                            card=card,
+                            style_pack=style_pack,
+                            aspect_ratio=aspect_ratio,
+                            total=total,
+                            language=language
+                        )
+                        image = ai_service.generate_image(
+                            prompt=prompt,
+                            ref_image_path=template_ref_path,
+                            additional_ref_images=card.get("ref_images") or None,
+                            aspect_ratio=aspect_ratio,
+                            resolution=resolution
+                        )
+                        if not image:
+                            raise ValueError("Failed to generate xhs image")
+
+                        if not page_obj:
+                            raise ValueError("Page not found for xhs card")
+                        image_path, _ = save_image_with_version(
+                            image=image,
+                            project_id=project_id,
+                            page_id=page_obj.id,
+                            file_service=file_service,
+                            page_obj=page_obj
+                        )
+                        display_path = page_obj.cached_image_path or page_obj.generated_image_path or image_path
+                        image_url = None
+                        if display_path:
+                            image_url = file_service.get_file_url(
+                                project_id, 'pages', Path(display_path).name
+                            )
+
+                        return {
+                            "index": idx,
+                            "url": image_url,
+                            "page_id": page_obj.id,
+                            "card": card,
+                        }
+                    except Exception as e:
+                        import traceback
+                        logger.error(f"Failed to generate xhs card {idx}: {traceback.format_exc()}")
+                        return {"index": idx, "error": str(e), "card": card}
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(_generate_one, c) for c in normalized_cards]
+                for future in as_completed(futures):
+                    res = future.result()
+                    if res.get("error"):
+                        failed += 1
+                    else:
+                        completed += 1
+                        results.append(res)
+
+                    t = Task.query.get(task_id)
+                    if t:
+                        t.update_progress(completed=completed, failed=failed)
+                        db.session.commit()
+
+            # Persist payload to project for history
+            results_sorted = sorted(results, key=lambda r: int(r.get("index", 0) or 0))
+            cards_for_payload = []
+            for c in normalized_cards:
+                if isinstance(c, dict):
+                    c = dict(c)
+                    c.pop("ref_images", None)
+                    cards_for_payload.append(c)
+            payload = {
+                "product_type": "xiaohongshu",
+                "mode": "vertical_carousel",
+                "aspect_ratio": aspect_ratio,
+                "resolution": resolution,
+                "image_count": total,
+                "copywriting": copywriting,
+                "style_pack": style_pack,
+                "cards": cards_for_payload,
+                "materials": payload.get("materials") if isinstance(payload.get("materials"), list) else [],
+            }
+
+            project = Project.query.get(project_id)
+            if project:
+                project.product_payload = json.dumps(payload, ensure_ascii=False)
+                project.updated_at = datetime.utcnow()
+                if failed == 0:
+                    project.status = 'COMPLETED'
+                db.session.commit()
+
+            # Mark task status
+            task = Task.query.get(task_id)
+            if task:
+                task.completed_at = datetime.utcnow()
+                if completed == 0 and failed > 0:
+                    task.status = 'FAILED'
+                else:
+                    task.status = 'COMPLETED'
+                db.session.commit()
+
+        except Exception as e:
+            task = Task.query.get(task_id)
+            if task:
+                task.status = 'FAILED'
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+
+
+def generate_xhs_single_card_task(
+    task_id: str,
+    project_id: str,
+    card_index: int,
+    ai_service,
+    file_service,
+    aspect_ratio: str = "4:5",
+    resolution: str = "2K",
+    use_template: bool = None,
+    app=None,
+    language: str = None
+):
+    """
+    Background task for generating a single Xiaohongshu card image.
+    """
+    if app is None:
+        raise ValueError("Flask app instance must be provided")
+
+    with app.app_context():
+        task = Task.query.get(task_id)
+        try:
+            if not task:
+                return
+
+            task.status = 'PROCESSING'
+            task.set_progress({"total": 1, "completed": 0, "failed": 0})
+            db.session.commit()
+
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+            resolved_use_template = use_template
+            if resolved_use_template is None:
+                resolved_use_template = bool(project.template_image_path or project.get_template_variants())
+
+            pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+            if not pages:
+                raise ValueError("No pages found for project")
+
+            total = len(pages)
+            if card_index < 0 or card_index >= total:
+                raise ValueError("card_index out of range")
+
+            aspect_ratio = (aspect_ratio or "4:5").strip()
+            resolution = (resolution or "2K").strip()
+
+            reference_files_content = _get_project_reference_files_content(project_id)
+            project_context = ProjectContext(project, reference_files_content)
+
+            outline_text = (project.outline_text or "").strip()
+            if not outline_text:
+                titles = []
+                for p in pages:
+                    oc = p.get_outline_content() or {}
+                    t = (oc.get('title') or '').strip()
+                    if t:
+                        titles.append(t)
+                if titles:
+                    outline_text = "\n".join([f"{i+1}. {t}" for i, t in enumerate(titles)])
+
+            payload = {}
+            if project.product_payload:
+                try:
+                    payload = json.loads(project.product_payload)
+                except Exception:
+                    payload = {}
+
+            copywriting = payload.get("copywriting") if isinstance(payload.get("copywriting"), dict) else {}
+            style_pack = payload.get("style_pack") if isinstance(payload.get("style_pack"), dict) else {}
+            payload_cards = payload.get("cards") if isinstance(payload.get("cards"), list) else []
+
+            if not copywriting or not style_pack:
+                blueprint = ai_service.generate_xhs_blueprint(
+                    project_context=project_context,
+                    outline_text=outline_text,
+                    image_count=total,
+                    aspect_ratio=aspect_ratio,
+                    language=language
+                )
+                if not copywriting:
+                    copywriting = blueprint.get("copywriting") if isinstance(blueprint.get("copywriting"), dict) else {}
+                if not style_pack:
+                    style_pack = blueprint.get("style_pack") if isinstance(blueprint.get("style_pack"), dict) else {}
+                if not payload_cards:
+                    payload_cards = blueprint.get("cards") if isinstance(blueprint.get("cards"), list) else []
+
+            if project.template_style:
+                style_pack = dict(style_pack or {})
+                style_pack["template_style"] = project.template_style
+            if project.extra_requirements:
+                style_pack = dict(style_pack or {})
+                style_pack["extra_requirements"] = project.extra_requirements
+
+            normalized_cards: List[Dict[str, Any]] = []
+            for i, page in enumerate(pages):
+                oc = page.get_outline_content() or {}
+                heading = (oc.get("title") or "").strip()
+                bullets = oc.get("points") if isinstance(oc.get("points"), list) else []
+                desc_content = page.get_description_content() or {}
+                desc_text = desc_content.get("text") or ""
+                if not desc_text and desc_content.get("text_content"):
+                    text_content = desc_content.get("text_content", [])
+                    if isinstance(text_content, list):
+                        desc_text = "\n".join(text_content)
+                    else:
+                        desc_text = str(text_content)
+                clean_desc = ai_service.remove_markdown_images(desc_text or "")
+                desc_lines = [line.strip() for line in clean_desc.splitlines() if line.strip()]
+
+                base_card = payload_cards[i] if i < len(payload_cards) and isinstance(payload_cards[i], dict) else {}
+                card = dict(base_card)
+                inferred_role = infer_page_type(page, total)
+                role = inferred_role if inferred_role in ["cover", "content", "ending"] else "content"
+                if not bullets and desc_lines:
+                    bullets = desc_lines[:6]
+
+                card.update({
+                    "index": i,
+                    "role": role,
+                    "heading": heading or card.get("heading", ""),
+                    "subheading": card.get("subheading", ""),
+                    "bullets": bullets or card.get("bullets", []) or [],
+                    "visual_suggestions": card.get("visual_suggestions", []) or [],
+                    "ref_images": ai_service.extract_image_urls_from_markdown(desc_text or ""),
+                })
+                if not card.get("visual_suggestions") and desc_lines:
+                    card["visual_suggestions"] = desc_lines[:4]
+                normalized_cards.append(card)
+
+            target_card = normalized_cards[card_index]
+            template_ref_path = None
+            if resolved_use_template and card_index < len(pages):
+                template_ref_path = pick_template_for_page(project, pages[card_index], total, file_service)
+            prompt = ai_service.generate_xhs_image_prompt(
+                card=target_card,
+                style_pack=style_pack,
+                aspect_ratio=aspect_ratio,
+                total=total,
+                language=language
+            )
+            image = ai_service.generate_image(
+                prompt=prompt,
+                ref_image_path=template_ref_path,
+                additional_ref_images=target_card.get("ref_images") or None,
+                aspect_ratio=aspect_ratio,
+                resolution=resolution
+            )
+            if not image:
+                raise ValueError("Failed to generate xhs image")
+
+            page_obj = pages[card_index]
+            save_image_with_version(
+                image=image,
+                project_id=project_id,
+                page_id=page_obj.id,
+                file_service=file_service,
+                page_obj=page_obj
+            )
+
+            cards_for_payload: List[Dict[str, Any]] = []
+            for c in normalized_cards:
+                if isinstance(c, dict):
+                    c = dict(c)
+                    c.pop("ref_images", None)
+                    cards_for_payload.append(c)
+
+            payload.update({
+                "product_type": "xiaohongshu",
+                "mode": "vertical_carousel",
+                "aspect_ratio": aspect_ratio,
+                "resolution": resolution,
+                "image_count": total,
+                "copywriting": copywriting,
+                "style_pack": style_pack,
+                "cards": cards_for_payload,
+                "materials": payload.get("materials") if isinstance(payload.get("materials"), list) else [],
+            })
+
+            project.product_payload = json.dumps(payload, ensure_ascii=False)
+            project.updated_at = datetime.utcnow()
+            project.status = 'COMPLETED'
+            db.session.commit()
+
+            task.status = 'COMPLETED'
+            task.completed_at = datetime.utcnow()
+            task.set_progress({"total": 1, "completed": 1, "failed": 0})
+            db.session.commit()
+
+        except Exception as e:
+            if task:
+                task.status = 'FAILED'
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                task.set_progress({"total": 1, "completed": 0, "failed": 1})
+                db.session.commit()
+
+
+def edit_xhs_card_image_task(
+    task_id: str,
+    project_id: str,
+    card_index: int,
+    edit_instruction: str,
+    ai_service,
+    file_service,
+    aspect_ratio: str = "4:5",
+    resolution: str = "2K",
+    additional_ref_images: List[str] = None,
+    use_template: bool = None,
+    temp_dir: str = None,
+    app=None
+):
+    """
+    Background task for editing an XHS card image.
+    """
+    if app is None:
+        raise ValueError("Flask app instance must be provided")
+
+    with app.app_context():
+        task = Task.query.get(task_id)
+        try:
+            if not task:
+                return
+            task.status = 'PROCESSING'
+            task.set_progress({"total": 1, "completed": 0, "failed": 0})
+            db.session.commit()
+
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+            resolved_use_template = use_template
+            if resolved_use_template is None:
+                resolved_use_template = bool(project.template_image_path or project.get_template_variants())
+
+            pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+            if not pages or card_index < 0 or card_index >= len(pages):
+                raise ValueError("card_index out of range")
+
+            page = pages[card_index]
+            current_image_path = None
+            if page.generated_image_path:
+                current_image_path = file_service.get_absolute_path(page.generated_image_path)
+            if not current_image_path:
+                material = get_current_xhs_material(project_id, card_index)
+                if not material:
+                    raise ValueError("No current xhs image found for index")
+                current_image_path = file_service.get_absolute_path(material.relative_path)
+
+            original_description = None
+            desc_content = page.get_description_content()
+            if desc_content:
+                original_description = desc_content.get('text') or ''
+                if not original_description and desc_content.get('text_content'):
+                    if isinstance(desc_content['text_content'], list):
+                        original_description = '\n'.join(desc_content['text_content'])
+                    else:
+                        original_description = str(desc_content['text_content'])
+
+            ref_images = list(additional_ref_images or [])
+            if resolved_use_template:
+                template_ref = pick_template_for_page(project, page, len(pages), file_service)
+                if template_ref:
+                    ref_images.insert(0, template_ref)
+
+            image = ai_service.edit_image(
+                prompt=edit_instruction,
+                current_image_path=current_image_path,
+                aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                original_description=original_description,
+                additional_ref_images=ref_images if ref_images else None
+            )
+            if not image:
+                raise ValueError("Failed to edit xhs image")
+
+            save_image_with_version(
+                image=image,
+                project_id=project_id,
+                page_id=page.id,
+                file_service=file_service,
+                page_obj=page
+            )
+
+            project.status = 'COMPLETED'
+            db.session.commit()
+
+            task.status = 'COMPLETED'
+            task.completed_at = datetime.utcnow()
+            task.set_progress({"total": 1, "completed": 1, "failed": 0})
+            db.session.commit()
+        except Exception as e:
+            if task:
+                task.status = 'FAILED'
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                task.set_progress({"total": 1, "completed": 0, "failed": 1})
+                db.session.commit()
+        finally:
+            if temp_dir:
+                try:
+                    import shutil
+                    from pathlib import Path
+                    temp_path = Path(temp_dir)
+                    if temp_path.exists():
+                        shutil.rmtree(temp_dir)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp directory {temp_dir}: {e}")
 
 
 def generate_descriptions_task(task_id: str, project_id: str, ai_service, 

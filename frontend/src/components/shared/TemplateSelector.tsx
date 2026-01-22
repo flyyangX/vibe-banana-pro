@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button, useToast, MaterialSelector, Modal, Textarea } from '@/components/shared';
 import { getImageUrl } from '@/api/client';
 import { listUserTemplates, uploadUserTemplate, deleteUserTemplate, generateTemplateVariants, getTaskStatus, uploadTemplateVariant, selectTemplateVariant, regenerateTemplateVariant, type UserTemplate } from '@/api/endpoints';
@@ -7,12 +7,12 @@ import type { Material } from '@/api/endpoints';
 import { ImagePlus, X } from 'lucide-react';
 
 const presetTemplates = [
-  { id: '1', name: '复古卷轴', preview: '/templates/template_y.png', thumb: '/templates/template_y-thumb.webp' },
-  { id: '2', name: '矢量插画', preview: '/templates/template_vector_illustration.png', thumb: '/templates/template_vector_illustration-thumb.webp' },
-  { id: '3', name: '拟物玻璃', preview: '/templates/template_glass.png', thumb: '/templates/template_glass-thumb.webp' },
-  { id: '4', name: '科技蓝', preview: '/templates/template_b.png', thumb: '/templates/template_b-thumb.webp' },
-  { id: '5', name: '简约商务', preview: '/templates/template_s.png', thumb: '/templates/template_s-thumb.webp' },
-  { id: '6', name: '学术报告', preview: '/templates/template_academic.jpg', thumb: '/templates/template_academic-thumb.webp' },
+  { id: '1', name: '复古卷轴', preview: '/templates/template_y.png', thumb: '/templates/template_y-thumb.webp', tags: ['ppt', 'universal'] },
+  { id: '2', name: '矢量插画', preview: '/templates/template_vector_illustration.png', thumb: '/templates/template_vector_illustration-thumb.webp', tags: ['ppt', 'universal'] },
+  { id: '3', name: '拟物玻璃', preview: '/templates/template_glass.png', thumb: '/templates/template_glass-thumb.webp', tags: ['ppt', 'universal'] },
+  { id: '4', name: '科技蓝', preview: '/templates/template_b.png', thumb: '/templates/template_b-thumb.webp', tags: ['ppt', 'universal'] },
+  { id: '5', name: '简约商务', preview: '/templates/template_s.png', thumb: '/templates/template_s-thumb.webp', tags: ['ppt', 'universal'] },
+  { id: '6', name: '学术报告', preview: '/templates/template_academic.jpg', thumb: '/templates/template_academic-thumb.webp', tags: ['ppt', 'universal'] },
 ];
 
 interface TemplateSelectorProps {
@@ -24,6 +24,8 @@ interface TemplateSelectorProps {
   templateVariants?: Record<string, string>;
   templateVariantsHistory?: Record<string, string[]>;
   onTemplatesGenerated?: () => Promise<void> | void;
+  productContext?: 'ppt' | 'xhs' | 'infographic';
+  showAllToggle?: boolean;
 }
 
 export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
@@ -35,6 +37,8 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   templateVariants = {},
   templateVariantsHistory = {},
   onTemplatesGenerated,
+  productContext = 'ppt',
+  showAllToggle = false,
 }) => {
   const templateVariantsTaskKey = 'templateVariantsTask';
   const templateVariantRegenerateTaskKey = 'templateVariantRegenerateTask';
@@ -60,6 +64,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   const [isVariantUploading, setIsVariantUploading] = useState(false);
   const [variantsExtraPrompt, setVariantsExtraPrompt] = useState('');
   const [isVariantSelecting, setIsVariantSelecting] = useState(false);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [variantGenerateStartedAt, setVariantGenerateStartedAt] = useState<number | null>(null);
   const [variantRegenerateStartedAt, setVariantRegenerateStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -152,6 +157,13 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
     : 0;
   const currentVariantUrl = previewVariantType ? templateVariants?.[previewVariantType] : undefined;
   const variantHistoryList = previewVariantType ? (templateVariantsHistory?.[previewVariantType] || []) : [];
+  const filterByTag = useCallback((tags?: string[]) => {
+    if (showAllTemplates || !productContext) return true;
+    const safeTags = tags || [];
+    return safeTags.includes(productContext) || safeTags.includes('universal');
+  }, [productContext, showAllTemplates]);
+  const filteredUserTemplates = useMemo(() => userTemplates.filter((t) => filterByTag(t.product_tags)), [userTemplates, filterByTag]);
+  const filteredPresetTemplates = useMemo(() => presetTemplates.filter((t) => filterByTag(t.tags)), [filterByTag]);
 
   const loadUserTemplates = async () => {
     setIsLoadingTemplates(true);
@@ -173,7 +185,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
       try {
         if (showUpload) {
           // 主页模式：直接上传到用户模板库
-          const response = await uploadUserTemplate(file);
+          const response = await uploadUserTemplate(file, undefined, productContext ? [productContext] : undefined);
           if (response.data) {
             const template = response.data;
             setUserTemplates(prev => [template, ...prev]);
@@ -184,7 +196,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           // 预览页模式：根据 saveToLibrary 状态决定是否保存到模板库
           if (saveToLibrary) {
             // 保存到模板库并应用
-            const response = await uploadUserTemplate(file);
+            const response = await uploadUserTemplate(file, undefined, productContext ? [productContext] : undefined);
             if (response.data) {
               const template = response.data;
               setUserTemplates(prev => [template, ...prev]);
@@ -226,7 +238,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
       // 根据 saveAsTemplate 参数决定是否保存到模板库
       if (saveAsTemplate) {
         // 保存到用户模板库
-        const response = await uploadUserTemplate(file);
+        const response = await uploadUserTemplate(file, undefined, productContext ? [productContext] : undefined);
         if (response.data) {
           const template = response.data;
           setUserTemplates(prev => [template, ...prev]);
@@ -466,12 +478,25 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   return (
     <>
       <div className="space-y-4">
+        {showAllToggle && (
+          <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <span>显示全部模板（包含不匹配当前产品的模板）</span>
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showAllTemplates}
+                onChange={(e) => setShowAllTemplates(e.target.checked)}
+              />
+              <span>{showAllTemplates ? '已开启' : '已关闭'}</span>
+            </label>
+          </div>
+        )}
         {/* 用户已保存的模板 */}
-        {userTemplates.length > 0 && (
+        {filteredUserTemplates.length > 0 && (
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-2">我的模板</h4>
             <div className="grid grid-cols-4 gap-4 mb-4">
-              {userTemplates.map((template) => (
+              {filteredUserTemplates.map((template) => (
                 <div
                   key={template.template_id}
                   onClick={() => handleSelectUserTemplate(template)}
@@ -515,7 +540,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           <h4 className="text-sm font-medium text-gray-700 mb-2">预设模板</h4>
           <div className="grid grid-cols-4 gap-4">
             {/* 预设模板 */}
-            {presetTemplates.map((template) => (
+            {filteredPresetTemplates.map((template) => (
               <div
                 key={template.id}
                 onClick={() => template.preview && handleSelectPresetTemplate(template.id, template.preview)}

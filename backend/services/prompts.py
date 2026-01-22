@@ -108,7 +108,7 @@ def _format_reference_files_xml(reference_files_content: Optional[List[Dict[str,
 
 def get_outline_generation_prompt(project_context: 'ProjectContext', language: str = None) -> str:
     """
-    生成 PPT 大纲的 prompt
+    生成大纲的 prompt（按产品类型区分）
     
     Args:
         project_context: 项目上下文对象，包含所有原始信息
@@ -120,8 +120,29 @@ def get_outline_generation_prompt(project_context: 'ProjectContext', language: s
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
     idea_prompt = project_context.idea_prompt or ""
     
+    product_type = (getattr(project_context, 'product_type', None) or 'ppt').strip().lower()
+    if product_type == 'infographic':
+        product_desc = "an infographic"
+        product_rules = "Do NOT mention PPT, slides, pages, or page numbers. Focus on infographic structure and sections."
+    elif product_type == 'xiaohongshu':
+        product_desc = "a Xiaohongshu vertical carousel"
+        product_rules = "Do NOT mention PPT or slides. Think in terms of cover + content cards + ending cadence."
+    else:
+        product_desc = "a ppt"
+        product_rules = ""
+
     prompt = (f"""\
-You are a helpful assistant that generates an outline for a ppt.
+You are a helpful assistant that generates an outline for {product_desc}.
+
+Freshness & Verification Policy (must follow):
+- You MUST use up-to-date information for factual claims (numbers, dates, rankings, "latest", "as of", policies, product specs, company status, etc.).
+- If your runtime has browsing / web access / search tools, you MUST search first to verify key facts before writing the outline.
+- If you do NOT have web access, or you cannot verify a fact from the provided <uploaded_files>, you MUST NOT guess or fabricate.
+  - Prefer high-level, timeless framing that stays accurate without precise numbers/dates.
+  - Do NOT include specific figures, “latest X”, or time-sensitive claims unless verified.
+- Internal self-check (do this silently):
+  - Remove/soften any unverified factual claim.
+  - Ensure each page title/points are consistent and non-contradictory.
 
 You can organize the content in two ways:
 
@@ -146,8 +167,9 @@ You can organize the content in two ways:
     }}
 ]
 
-Choose the format that best fits the content. Use parts when the PPT has clear major sections.
-Unless otherwise specified, the first page should be kept simplest, containing only the title, subtitle, and presenter information.
+Choose the format that best fits the content. Use parts when the content has clear major sections.
+Unless otherwise specified, the first item should be kept simplest, containing only the title and optional subtitle.
+{product_rules}
 
 The user's request: {idea_prompt}. Now generate the outline, don't include any other text.
 {get_language_instruction(language)}
@@ -171,8 +193,19 @@ def get_outline_parsing_prompt(project_context: 'ProjectContext', language: str 
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
     outline_text = project_context.outline_text or ""
     
+    product_type = (getattr(project_context, 'product_type', None) or 'ppt').strip().lower()
+    if product_type == 'infographic':
+        product_desc = "an infographic"
+        product_rules = "Do NOT mention PPT, slides, pages, or page numbers."
+    elif product_type == 'xiaohongshu':
+        product_desc = "a Xiaohongshu vertical carousel"
+        product_rules = "Do NOT mention PPT or slides. Keep cover/content/ending cadence in mind."
+    else:
+        product_desc = "a ppt"
+        product_rules = ""
+
     prompt = (f"""\
-You are a helpful assistant that parses a user-provided PPT outline text into a structured format.
+You are a helpful assistant that parses a user-provided outline text for {product_desc} into a structured format.
 
 The user has provided the following outline text:
 
@@ -212,6 +245,7 @@ Important rules:
 - Preserve all titles, bullet points, and text exactly as they appear
 - If the text has clear sections/parts, use the part-based format
 - Extract titles and points from the original text, keeping them exactly as written
+{product_rules}
 
 Now parse the outline text above into the structured format. Return only the JSON, don't include any other text.
 {get_language_instruction(language)}
@@ -285,8 +319,22 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
     extra_req_text = extra_requirements.strip() if extra_requirements else ""
     extra_req_block = f"\n额外要求（请务必遵循）：\n{extra_req_text}\n" if extra_req_text else ""
 
+    product_type = (getattr(project_context, 'product_type', None) or 'ppt').strip().lower()
+    if product_type == 'infographic':
+        product_intro = "我们正在为信息图的每一页生成内容描述。"
+        render_note = "生成的“页面文字”会直接渲染到信息图画面上，请保持精炼可读。"
+        avoid_note = "避免出现“PPT/幻灯片/页码”等词。"
+    elif product_type == 'xiaohongshu':
+        product_intro = "我们正在为小红书竖版轮播卡片生成内容描述。"
+        render_note = "生成的“页面文字”会直接渲染到卡片画面上，请保持精炼、抓眼、适合手机阅读。"
+        avoid_note = "避免出现“PPT/幻灯片/页码”等词。"
+    else:
+        product_intro = "我们正在为PPT的每一页生成内容描述。"
+        render_note = "生成的“页面文字”部分会直接渲染到PPT页面上，因此请务必注意："
+        avoid_note = ""
+
     prompt = (f"""\
-我们正在为PPT的每一页生成内容描述。
+{product_intro}
 用户的原始需求是：\n{original_input}\n
 我们已经有了完整的大纲：\n{outline}\n{part_info}
 现在请为第 {page_index} 页生成描述：
@@ -294,7 +342,18 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
 {desc_type_notes.get(normalized_page_type, "")}
 {extra_req_block}
 
-【重要提示】生成的"页面文字"部分会直接渲染到PPT页面上，因此请务必注意：
+【事实性内容 & 联网要求（必须遵守）】
+1) 只要涉及“事实/数据/日期/排名/政策/产品规格/公司现状/最新进展”等时效性强的信息，你必须优先使用以下来源：
+   - 用户上传的 <uploaded_files>（若存在，视为最高优先级事实依据）
+   - 以及（如果你的运行环境提供联网检索/浏览能力）先进行联网检索再写入结论
+2) 如果你无法联网，且 <uploaded_files> 中也没有足够依据：
+   - 你必须避免写出具体数字/年份/“最新”结论；不要胡编乱造
+   - 改为使用不依赖具体数据的表达（趋势/机制/框架/可验证的方法），保持严谨与可替换
+3) 自我检验（在输出前默默完成，不要写出来）：
+   - 检查是否存在任何未经核验的断言；如有，删除或改成可验证的中性表述
+   - 检查是否与本页大纲/全局大纲矛盾；如有，修正
+
+【重要提示】{render_note}
 1. 文字内容要简洁精炼，每条要点控制在15-25字以内
 2. 条理清晰，使用列表形式组织内容
 3. 避免冗长的句子和复杂的表述
@@ -303,6 +362,7 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
 6. 为了避免“模板化”，请**不要**把每条要点都写成“标签：解释”的固定句式（例如“成长隐喻：……/核心观点：……”这类）。
    - 更推荐：直接用自然语言短句表达观点（可用动词开头），或用“短语 + 补充说明”的方式，但不要每条都用冒号。
    - 允许少量（≤ 1 条）出现“概念：说明”用于强调关键词，但请控制频率并与其他句式混用。
+{avoid_note}
 
 输出格式示例：
 页面标题：原始社会：与自然共生
@@ -316,7 +376,7 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
 
 其他页面素材（如果文件中存在请积极添加，包括markdown图片链接、公式、表格等）
 
-【关于图片】如果参考文件中包含以 /files/ 开头的本地文件URL图片（例如 /files/mineru/xxx/image.png），请将这些图片以markdown格式输出，例如：![图片描述](/files/mineru/xxx/image.png)。这些图片会被包含在PPT页面中。
+【关于图片】如果参考文件中包含以 /files/ 开头的本地文件URL图片（例如 /files/mineru/xxx/image.png），请将这些图片以markdown格式输出，例如：![图片描述](/files/mineru/xxx/image.png)。这些图片会被包含在最终画面中。
 
 {get_language_instruction(language)}
 """)
@@ -329,6 +389,7 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
 def get_template_style_prompt(project_context: 'ProjectContext',
                               outline_text: str = "",
                               extra_requirements: str = None,
+                              existing_template_style: str = None,
                               language: str = None) -> str:
     """
     生成“风格描述”的 prompt（用于 project.template_style）
@@ -347,6 +408,7 @@ def get_template_style_prompt(project_context: 'ProjectContext',
     description_text = project_context.description_text or ""
     outline_text = outline_text or project_context.outline_text or ""
     extra_req_text = extra_requirements.strip() if extra_requirements else ""
+    existing_style_text = (existing_template_style or "").strip()
     
     prompt = (f"""\
 You are a world-class presentation designer and storyteller. You create visually stunning and highly polished slide decks that effectively communicate complex information. Think mastery over design with a flair for storytelling.
@@ -365,6 +427,9 @@ Inputs:
 - Description text (if provided):
 {description_text}
 
+- User-provided style description (if provided; treat as ground truth, do NOT override):
+{existing_style_text}
+
 - Extra requirements (if provided):
 {extra_req_text}
 
@@ -374,6 +439,7 @@ Output requirements:
 3) Cover: overall tone, color palette (with 2-4 colors and optional hex), typography, layout/grid, imagery style, iconography, data visualization, and consistency rules.
 4) Ensure the style supports story flow, clear hierarchy, and readability.
 5) Use a single consistent style across all slides.
+5.1) If a user-provided style description is present, you MUST preserve its intent and constraints. You may only reorganize, clarify, and add missing actionable details.
 6) Do NOT include headers, footers, page numbers, breadcrumbs, navigation bars, watermarks, or print artifacts unless explicitly required by the user input.
 {get_language_instruction(language)}
 """)
@@ -1117,4 +1183,276 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
 # 你是一位专业的图像修复专家。请你修复上传的图像，去除其中的涂抹痕迹，消除所有的模糊、噪点、伪影，输出处理后的高清图像，其他区域保持和原图**完全相同**，颜色、布局、线条、装饰需要完全一致.
 # {regions_info}
 # """
+    return prompt
+
+
+def get_infographic_blueprint_prompt(project_context: 'ProjectContext',
+                                     outline_text: str = "",
+                                     page_title: str = "",
+                                     page_desc: str = "",
+                                     mode: str = "single",
+                                     extra_requirements: str = "",
+                                     template_style: str = "",
+                                     language: str = None) -> str:
+    """
+    生成信息图“结构蓝图”的 prompt（先压缩信息，再给图像生成）
+    """
+    files_xml = _format_reference_files_xml(project_context.reference_files_content)
+    idea_prompt = project_context.idea_prompt or ""
+    description_text = project_context.description_text or ""
+    outline_text = outline_text or project_context.outline_text or ""
+    page_title = page_title or ""
+    page_desc = page_desc or ""
+    mode = (mode or "single").strip().lower()
+    extra_req_text = (extra_requirements or "").strip()
+    style_text = (template_style or "").strip()
+
+    mode_hint = "单张信息图" if mode == "single" else "多张信息图（本页为其中一张）"
+
+    prompt = f"""\
+你是一名信息图内容策划。你的任务是将输入内容压缩成“信息图结构蓝图”，用于后续生成视觉信息图。
+
+当前模式：{mode_hint}
+
+输入：
+- 项目想法/主题：
+{idea_prompt}
+
+- 大纲（如果有）：
+{outline_text}
+
+- 描述文本（如果有）：
+{description_text}
+
+- 当前页标题（仅多张模式有效）：
+{page_title}
+
+- 当前页描述（仅多张模式有效）：
+{page_desc}
+
+额外要求（如有）：
+{extra_req_text}
+
+风格描述（如有）：
+{style_text}
+
+输出要求：
+1) 只输出纯文本（不要 JSON、不要代码块）。
+2) 输出格式为“分区块的要点清单”，每个区块包含：区块标题 + 3-6 条要点。
+3) 必须包含数据化表达建议（如时间线、对比表、流程图、统计数字、地图/分布）。
+4) 语言简洁、信息密度高、层级清楚。
+5) 不要出现“PPT/幻灯片/页码”等词。
+{get_language_instruction(language)}
+"""
+
+    final_prompt = files_xml + prompt
+    logger.debug(f"[get_infographic_blueprint_prompt] Final prompt:\n{final_prompt}")
+    return final_prompt
+
+
+def get_infographic_image_prompt(blueprint: str,
+                                 mode: str = "single",
+                                 page_title: str = "",
+                                 extra_requirements: str = "",
+                                 template_style: str = "",
+                                 aspect_ratio: str = "",
+                                 language: str = None) -> str:
+    """
+    生成信息图图片的 prompt（非 PPT 风格）
+    """
+    mode = (mode or "single").strip().lower()
+    mode_hint = "单张信息图" if mode == "single" else "多张信息图中的一张"
+    page_title = page_title or ""
+    extra_req_text = (extra_requirements or "").strip()
+    style_text = (template_style or "").strip()
+    ratio_text = (aspect_ratio or "").strip()
+
+    prompt = f"""\
+你是一名专业信息图设计师。请根据给定蓝图生成一张高信息密度的信息图（不是PPT/不是幻灯片）。
+
+模式：{mode_hint}
+页标题（可选）：{page_title}
+
+信息图蓝图：
+{blueprint}
+
+额外要求（如有）：
+{extra_req_text}
+
+风格描述（如有）：
+{style_text}
+
+设计要求：
+- 版式为信息图/海报型排版，遵循画布比例：{ratio_text or "由系统配置决定"}。
+- 强调数据化表达：时间线、对比表、流程图、数字指标、图标等优先。
+- 信息密度高但可读性强，合理留白与对齐。
+- 禁止出现“PPT风格、分页、页码、页眉页脚、导航条、水印”。
+- 统一风格与配色，避免花哨装饰。
+{get_language_instruction(language)}
+"""
+    logger.debug(f"[get_infographic_image_prompt] Final prompt:\n{prompt}")
+    return prompt
+
+
+def get_xhs_blueprint_prompt(
+    project_context: 'ProjectContext',
+    outline_text: str = "",
+    image_count: int = 7,
+    aspect_ratio: str = "4:5",
+    language: str = None
+) -> str:
+    """
+    生成“小红书图文（竖版轮播）”的结构化蓝图（JSON）。
+    """
+    files_xml = _format_reference_files_xml(project_context.reference_files_content)
+    idea_prompt = project_context.idea_prompt or ""
+    description_text = project_context.description_text or ""
+    outline_text = outline_text or project_context.outline_text or ""
+    extra_req_text = (getattr(project_context, 'extra_requirements', '') or '').strip()
+    style_text = (getattr(project_context, 'template_style', '') or '').strip()
+    safe_count = int(image_count or 7)
+    safe_count = min(9, max(6, safe_count))
+    aspect_ratio = (aspect_ratio or "4:5").strip()
+
+    prompt = f"""\
+你是一名“小红书图文内容策划 + 信息卡片编辑”。请将输入内容整理成一个可直接生成“竖版轮播图文”的结构化蓝图（JSON）。
+
+目标产物：
+- 竖版轮播图文（手机阅读），共 {safe_count} 张图（第 1 张为封面，其余为内容卡片）
+- 同时输出小红书文案：标题、正文、话题标签
+
+图片参数：
+- 建议画幅比例：{aspect_ratio}（竖版）
+
+输入：
+- 项目想法/主题：
+{idea_prompt}
+
+- 大纲（如果有）：
+{outline_text}
+
+- 描述文本（如果有）：
+{description_text}
+
+- 额外要求（如有，必须严格遵循）：
+{extra_req_text or "无"}
+
+- 风格描述（如有，必须严格遵循）：
+{style_text or "无"}
+
+输出要求（必须严格遵守）：
+1) 只输出 JSON（不要 markdown 代码块、不要额外解释文字）。
+2) JSON schema 如下：
+{{
+  "product_type": "xiaohongshu",
+  "mode": "vertical_carousel",
+  "aspect_ratio": "{aspect_ratio}",
+  "image_count": {safe_count},
+  "copywriting": {{
+    "title": "主标题（<=20字，吸引点击）",
+    "title_candidates": ["备选标题1", "备选标题2", "备选标题3"],
+    "body": "正文（口语化、分段、可读性强，建议含要点/步骤/避坑/总结）",
+    "hashtags": ["#话题1", "#话题2", "#话题3"]
+  }},
+  "style_pack": {{
+    "tone": "整体语气/人设（例如：理性科普/亲测分享/干货清单）",
+    "palette": ["主色#HEX", "辅助色#HEX", "高亮色#HEX"],
+    "typography": "字体风格/字重/字号层级（标题、正文、数字强调）",
+    "title_style": "标题样式（颜色、加粗、描边/高光方式）",
+    "background": "背景材质/纹理/光影/留白规则（可含颜色与透明度）",
+    "highlight_rules": "高亮/标注/强调的使用方式与频率",
+    "do": ["必须做的设计规则1", "规则2"],
+    "dont": ["禁止做的设计规则1", "规则2"]
+  }},
+  "cards": [
+    {{
+      "index": 0,
+      "role": "cover",
+      "heading": "封面主标题（<=14字）",
+      "subheading": "封面副标题（可选，<=20字）",
+      "bullets": ["要点1", "要点2"],
+      "visual_suggestions": ["图标/图形建议", "结构建议"]
+    }},
+    {{
+      "index": 1,
+      "role": "content",
+      "heading": "内容卡标题（<=14字）",
+      "subheading": "（可选）",
+      "bullets": ["3-6条要点，短句"],
+      "visual_suggestions": ["时间线/对比表/流程图/清单/数字强调等建议"]
+    }}
+  ]
+}}
+3) cards 数组长度必须等于 image_count，index 从 0 到 image_count-1，且严格递增。
+4) 每张卡片都要“信息密度高但可读”，避免长段落；更倾向清单、步骤、对比、时间线。
+5) 文案与卡片内容要一致，不要虚构无法自洽的信息；如果不确定，使用保守表述并标注“可能/一般/通常”。
+6) 标题与正文的写作规范（尽量遵循，除非与“额外要求/风格描述”冲突）：
+   - 标题：15-25字优先，尽量包含数字/对比/疑问/痛点中的 1-2 个；emoji 可少量点缀但不要堆叠。
+   - 正文：200-500字，分段清晰（2-4行/段），开头必须有 hook，结尾建议有互动引导（例如“你们更想看哪条？”）。
+   - hashtags：5-8个，兼顾大词+精准小词，按重要性排序；必须以 # 开头。
+7) JSON 中如需换行，请使用 \\n（不要输出 markdown）。\n{get_language_instruction(language)}
+"""
+    final_prompt = files_xml + prompt
+    logger.debug(f"[get_xhs_blueprint_prompt] Final prompt:\n{final_prompt}")
+    return final_prompt
+
+
+def get_xhs_image_prompt(
+    card: Dict,
+    style_pack: Dict,
+    aspect_ratio: str = "4:5",
+    total: int = 7,
+    language: str = None
+) -> str:
+    """
+    生成单张“小红书竖版信息卡片”图片的 prompt。
+    """
+    card = card or {}
+    style_pack = style_pack or {}
+    index = card.get("index", 0)
+    role = (card.get("role") or ("cover" if index == 0 else "content")).strip()
+    heading = card.get("heading", "")
+    subheading = card.get("subheading", "")
+    bullets = card.get("bullets") or []
+    if not isinstance(bullets, list):
+        bullets = [str(bullets)]
+    bullets_text = "\n".join([f"- {str(b).strip()}" for b in bullets if str(b).strip()])
+    visual_suggestions = card.get("visual_suggestions") or []
+    if not isinstance(visual_suggestions, list):
+        visual_suggestions = [str(visual_suggestions)]
+    visual_text = "\n".join([f"- {str(v).strip()}" for v in visual_suggestions if str(v).strip()])
+
+    style_text = json.dumps(style_pack, ensure_ascii=False, indent=2) if style_pack else "{}"
+
+    prompt = f"""\
+你是一名“小红书竖版信息卡片”视觉设计师。请生成一张竖版轮播图（不是PPT/不是幻灯片）。
+
+画幅比例：{aspect_ratio}
+总张数：{total}
+当前张：{index + 1}/{total}
+角色：{role}
+
+统一风格包（必须遵循）：
+{style_text}
+
+本页内容：
+- 主标题：{heading}
+- 副标题：{subheading}
+- 要点：
+{bullets_text}
+
+可视化建议（可选，尽量采纳）：
+{visual_text}
+
+设计要求：
+- 竖版、手机可读：字号足够大、层级清晰、对齐与留白统一。
+- 信息卡片风：用模块/卡片/分区块表达，优先清单、步骤、对比、时间线、数字强调。
+- 文字必须清晰可读且内容准确；避免生成乱码或难以辨认的文字。
+- 不要出现页码、页眉页脚、导航条、水印、PPT元素。
+- 合规硬约束：禁止出现任何“小红书logo/水印/右下角用户ID/平台标识”；如参考图中带有水印/Logo（尤其右下角、左上角），生成结果必须去除。
+- 画面必须保持竖屏阅读方向：禁止旋转、倒置、横版排版。
+- 不要添加手机边框、截屏UI、白色留边或相框。
+{get_language_instruction(language)}
+"""
+    logger.debug(f"[get_xhs_image_prompt] Final prompt:\n{prompt}")
     return prompt

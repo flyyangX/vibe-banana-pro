@@ -115,6 +115,12 @@ export const SlidePreview: React.FC = () => {
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
   const [isMaterialSelectorOpen, setIsMaterialSelectorOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
+  // 无模板批量生成：前置“准备提示词/统一风格”反馈
+  const [isBatchPreparing, setIsBatchPreparing] = useState(false);
+  const [batchPreparingText, setBatchPreparingText] = useState('');
+  const batchPreparingTargetPageIdsRef = useRef<string[]>([]);
+  const batchPreparingIntervalRef = useRef<number | null>(null);
+  const batchPreparingIndexRef = useRef(0);
   // 导出设置
   const [exportExtractorMethod, setExportExtractorMethod] = useState<ExportExtractorMethod>(
     (currentProject?.export_extractor_method as ExportExtractorMethod) || 'hybrid'
@@ -159,6 +165,55 @@ export const SlidePreview: React.FC = () => {
   const hasGeneratingPages = useMemo(() => {
     return Object.keys(pageGeneratingTasks || {}).length > 0;
   }, [pageGeneratingTasks]);
+
+  const batchPreparingMessages = useMemo(
+    () => [
+      '无模板模式启动：先给整套 PPT 统一一下风格…',
+      '正在写提示词：标题站左边，图表站右边…',
+      '配色盘在挑选中：冷静、克制、但要好看…',
+      '版式在排队：对齐、留白、层级，一个都不能少…',
+      '给每一页发任务单：马上开始出图…',
+    ],
+    []
+  );
+
+  const stopBatchPreparing = useCallback(() => {
+    if (batchPreparingIntervalRef.current) {
+      window.clearInterval(batchPreparingIntervalRef.current);
+      batchPreparingIntervalRef.current = null;
+    }
+    batchPreparingTargetPageIdsRef.current = [];
+    batchPreparingIndexRef.current = 0;
+    setIsBatchPreparing(false);
+    setBatchPreparingText('');
+  }, []);
+
+  const startBatchPreparing = useCallback((targetPageIds: string[]) => {
+    // 重入保护：先停掉上一次
+    stopBatchPreparing();
+    batchPreparingTargetPageIdsRef.current = targetPageIds;
+    batchPreparingIndexRef.current = 0;
+    setIsBatchPreparing(true);
+    setBatchPreparingText(batchPreparingMessages[0] || '正在准备…');
+
+    batchPreparingIntervalRef.current = window.setInterval(() => {
+      batchPreparingIndexRef.current += 1;
+      const nextText = batchPreparingMessages[batchPreparingIndexRef.current % batchPreparingMessages.length];
+      setBatchPreparingText(nextText);
+    }, 1200);
+  }, [batchPreparingMessages, stopBatchPreparing]);
+
+  // 一旦批量生成真正开始（拿到任意页面 taskId），就结束“准备中”提示
+  useEffect(() => {
+    if (!isBatchPreparing) return;
+    const ids = batchPreparingTargetPageIdsRef.current;
+    if (!ids || ids.length === 0) return;
+    const hasAnyTaskStarted = ids.some((id) => Boolean(pageGeneratingTasks?.[id]));
+    if (hasAnyTaskStarted) {
+      stopBatchPreparing();
+      show({ message: '提示词准备完成，开始出图了。', type: 'success' });
+    }
+  }, [isBatchPreparing, pageGeneratingTasks, show, stopBatchPreparing]);
 
   useEffect(() => {
     if (!hasGeneratingPages) {
@@ -279,13 +334,29 @@ export const SlidePreview: React.FC = () => {
     
     // 检查要生成的页面中是否有已有图片的
     const pagesToGenerate = isPartialGenerate
-      ? currentProject?.pages.filter(p => p.id && selectedPageIds.has(p.id))
+      ? currentProject?.pages.filter((p: Page) => p.id && selectedPageIds.has(p.id))
       : currentProject?.pages;
-    const hasImages = pagesToGenerate?.some((p) => p.generated_image_path);
+    const hasImages = pagesToGenerate?.some((p: Page) => p.generated_image_path);
     
     const useTemplateOption =
       templateUsageMode === 'auto' ? undefined : templateUsageMode === 'template';
+
+    // 计算本次是否会走“无模板”链路（无模板会先生成风格/提示词，容易出现短暂“无响应”感）
+    const willUseTemplate = useTemplateOption === true || (useTemplateOption === undefined && hasTemplateResource);
+    const willNoTemplate = !willUseTemplate;
+
+    // 本次要提交的页面 id 列表（用于“准备中”状态自动收敛）
+    const targetPageIds = (pageIds && pageIds.length > 0)
+      ? pageIds
+      : (currentProject?.pages || []).map((p: Page) => p.id).filter((id: string | undefined): id is string => !!id);
+
     const executeGenerate = async () => {
+      if (willNoTemplate) {
+        startBatchPreparing(targetPageIds);
+        show({ message: '无模板批量生成已启动：我先写提示词并统一风格，请稍候…', type: 'info' });
+      } else {
+        show({ message: '正在创建生成任务，请稍候…', type: 'info' });
+      }
       await generateImages(pageIds, { useTemplate: useTemplateOption });
     };
     
@@ -1232,12 +1303,18 @@ export const SlidePreview: React.FC = () => {
               icon={<Sparkles size={16} className="md:w-[18px] md:h-[18px]" />}
               onClick={handleGenerateAll}
               className="w-full text-sm md:text-base"
-              disabled={currentProject.pages.length === 0}
+              disabled={currentProject.pages.length === 0 || isBatchPreparing}
             >
               {isMultiSelectMode && selectedPageIds.size > 0
                 ? `生成选中页面 (${selectedPageIds.size})`
                 : `批量生成图片 (${currentProject.pages.length})`}
             </Button>
+            {isBatchPreparing && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="truncate">{batchPreparingText || '正在准备…'}</span>
+              </div>
+            )}
           </div>
           
           {/* 缩略图列表：桌面端垂直，移动端横向滚动 */}

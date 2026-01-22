@@ -75,6 +75,13 @@ export const OutlineEditor: React.FC = () => {
   const { confirm, ConfirmDialog } = useConfirm();
   const { show, ToastContainer } = useToast();
 
+  const productTypeLabel =
+    currentProject?.product_type === 'infographic'
+      ? '信息图主题'
+      : currentProject?.product_type === 'xiaohongshu'
+        ? '小红书主题'
+        : 'PPT构想';
+
   // 加载项目数据
   useEffect(() => {
     if (projectId && (!currentProject || currentProject.id !== projectId)) {
@@ -234,7 +241,18 @@ export const OutlineEditor: React.FC = () => {
               variant="primary"
               size="sm"
               icon={<ArrowRight size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={() => navigate(`/project/${projectId}/detail`)}
+              onClick={() => {
+                if (currentProject?.product_type === 'infographic') {
+                  navigate(`/project/${projectId}/infographic`);
+                  return;
+                }
+                if (currentProject?.product_type === 'xiaohongshu') {
+                  // 小红书需要先生成/编辑批量描述（蓝图），因此先进入详情编辑页
+                  navigate(`/project/${projectId}/detail`);
+                  return;
+                }
+                navigate(`/project/${projectId}/detail`);
+              }}
               className="text-xs md:text-sm"
             >
               <span className="hidden sm:inline">下一步</span>
@@ -260,7 +278,7 @@ export const OutlineEditor: React.FC = () => {
         <div className="flex items-start gap-1.5 md:gap-2 text-xs md:text-sm">
           {currentProject.creation_type === 'idea' && (
             <span className="font-medium text-gray-700 flex-shrink-0 flex items-center">
-              <Sparkle size={12} className="mr-1" /> PPT构想:
+              <Sparkle size={12} className="mr-1" /> {productTypeLabel}:
               <span className="text-gray-900 font-normal ml-2 break-words whitespace-pre-wrap">{currentProject.idea_prompt}</span>
             </span>
           )}

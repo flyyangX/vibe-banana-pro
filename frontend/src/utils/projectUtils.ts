@@ -95,7 +95,26 @@ export const getStatusColor = (project: Project): string => {
 export const getProjectRoute = (project: Project): string => {
   const projectId = project.id || project.project_id;
   if (!projectId) return '/';
-  
+  const isInfographic = project.product_type === 'infographic';
+  const isXhs = project.product_type === 'xiaohongshu';
+  const isNonPpt = isInfographic || isXhs;
+
+  if (isNonPpt) {
+    // 已在出图中或完成，进入对应预览页
+    if (project.status === 'GENERATING_INFOGRAPHIC' || project.status === 'GENERATING_XHS' || project.status === 'COMPLETED') {
+      return isInfographic ? `/project/${projectId}/infographic` : `/project/${projectId}/xhs`;
+    }
+    // 否则按照编辑链路进入
+    if (project.pages && project.pages.length > 0) {
+      const hasDescriptions = project.pages.some(p => p.description_content);
+      if (hasDescriptions) {
+        return `/project/${projectId}/detail`;
+      }
+      return `/project/${projectId}/outline`;
+    }
+    return `/project/${projectId}/outline`;
+  }
+
   if (project.pages && project.pages.length > 0) {
     const hasImages = project.pages.some(p => p.generated_image_path);
     if (hasImages) {

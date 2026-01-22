@@ -20,7 +20,9 @@ Usage:
 
 import logging
 from threading import Lock
-from typing import Optional
+from typing import Optional, Callable, Dict, Any
+import time
+import hashlib
 from flask import current_app, has_app_context
 from .ai_service import AIService
 from .ai_providers import get_text_provider, get_image_provider, TextProvider, ImageProvider
@@ -35,6 +37,79 @@ _lock = Lock()
 _text_provider_cache: dict = {}
 _image_provider_cache: dict = {}
 _cache_lock = Lock()
+
+# Refined template_style cache (per project) to avoid per-page re-generation
+_refined_style_cache: Dict[str, Dict[str, Any]] = {}
+_refined_style_lock = Lock()
+_REFINED_STYLE_TTL_SECONDS = 15 * 60  # 15 minutes
+
+
+def get_cached_refined_template_style(
+    project_id: str,
+    base_style: str,
+    outline_text: str,
+    extra_requirements: str,
+    language: str,
+    generate_fn: Callable[[], str],
+) -> str:
+    """
+    Cache a refined template style for a short period to keep style consistent across
+    "batch generation" that is implemented as per-page requests on the frontend.
+
+    - Does NOT persist to DB (so it won't overwrite user-provided template_style)
+    - Ensures only the first page triggers the refinement call; subsequent pages reuse it
+    """
+    base_style_str = (base_style or "").strip()
+    if not base_style_str:
+        return ""
+
+    # Build a stable cache key that changes when inputs change
+    fingerprint_src = "\n".join(
+        [
+            base_style_str,
+            (extra_requirements or "").strip(),
+            (outline_text or "").strip(),
+            (language or "").strip(),
+        ]
+    ).encode("utf-8")
+    fingerprint = hashlib.sha1(fingerprint_src).hexdigest()
+    cache_key = f"{project_id}:{fingerprint}"
+    now = time.time()
+
+    cached = _refined_style_cache.get(cache_key)
+    if cached and (now - float(cached.get("ts", 0))) < _REFINED_STYLE_TTL_SECONDS:
+        return str(cached.get("style", "")).strip() or base_style_str
+
+    with _refined_style_lock:
+        cached = _refined_style_cache.get(cache_key)
+        if cached and (now - float(cached.get("ts", 0))) < _REFINED_STYLE_TTL_SECONDS:
+            return str(cached.get("style", "")).strip() or base_style_str
+
+        try:
+            refined = (generate_fn() or "").strip()
+        except Exception:
+            logger.exception("Failed to refine template style; falling back to base style")
+            refined = ""
+
+        effective = refined or base_style_str
+        _refined_style_cache[cache_key] = {"ts": now, "style": effective}
+
+        # Best-effort cleanup: drop expired entries for this project
+        try:
+            expired_keys = []
+            for k, v in _refined_style_cache.items():
+                if not k.startswith(f"{project_id}:"):
+                    continue
+                ts = float(v.get("ts", 0))
+                if (now - ts) >= _REFINED_STYLE_TTL_SECONDS:
+                    expired_keys.append(k)
+            for k in expired_keys:
+                _refined_style_cache.pop(k, None)
+        except Exception:
+            # never fail the request due to cleanup
+            pass
+
+        return effective
 
 
 def _get_cached_text_provider(model: str) -> TextProvider:

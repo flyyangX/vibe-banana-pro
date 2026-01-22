@@ -235,6 +235,32 @@ OPENAI_API_BASE=https://api.openai.com/v1
 ...
 ```
 
+<details>
+  <summary>📒 使用 GRSAI（nano-banana 专用接口说明）</summary>
+
+当你在使用 GRSAI 的 nano-banana 系列能力时，接口行为和原生 Gemini/OpenAI 有一些差异（本项目已做了自动兼容）：
+
+- **图片生成**：当 `GOOGLE_API_BASE` 包含 `grsai` 且 `IMAGE_MODEL` 为 `nano-banana*` 时，会自动走 GRSAI 专用接口 `POST /v1/draw/nano-banana`，并轮询 `POST /v1/draw/result` 获取最终图片（不是原生 Gemini/OpenAI 的图片接口）。
+- **文本生成**：GRSAI 的 Gemini 代理在部分场景下返回结构与官方 SDK 不完全一致，因此当检测到 `GOOGLE_API_BASE` 包含 `grsai` 时，会自动切换为 OpenAI Chat API 方式调用（`/v1/chat/completions`）。
+
+推荐 `.env` 配置示例：
+
+```env
+AI_PROVIDER_FORMAT=gemini
+GOOGLE_API_KEY=your-grsai-api-key-here
+# 关键：填“域名根”，不要带 /v1 或 /v1beta（否则图片接口会变成 /v1/v1/draw/...）
+GOOGLE_API_BASE=https://grsai.dakka.com.cn
+
+# 选择 nano-banana 系列图片模型（触发 GRSAI 专用 draw 接口）
+IMAGE_MODEL=nano-banana-pro-cl
+
+# 如你的 GRSAI 文本模型名不同，可在这里调整（或在网页「设置」页调整）
+# TEXT_MODEL=...
+```
+
+支持的 `IMAGE_MODEL`（nano-banana）示例：`nano-banana-fast`、`nano-banana`、`nano-banana-pro`、`nano-banana-pro-vt`、`nano-banana-pro-cl`、`nano-banana-pro-vip`、`nano-banana-pro-4k-vip`。
+</details>
+
 **使用新版可编辑导出配置方法，获得更好的可编辑导出效果**: 需在[百度智能云平台](https://console.bce.baidu.com/iam/#/iam/apikey/list)中获取API KEY，填写在.env文件中的BAIDU_OCR_API_KEY字段（有充足的免费使用额度）。详见https://github.com/Anionex/banana-slides/issues/121 中的说明
 
 
