@@ -15,6 +15,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 logger = logging.getLogger(__name__)
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except Exception:
+    # HEIC/HEIF support is optional; ignore if dependency missing
+    pass
+
 
 # 支持的语言类型
 LanguageType = Literal[

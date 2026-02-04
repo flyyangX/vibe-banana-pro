@@ -9,9 +9,16 @@ import zipfile
 import io
 import base64
 import requests
+from pathlib import Path
+from PIL import UnidentifiedImageError
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except Exception:
+    pass
 from markitdown import MarkItDown
 
 logger = logging.getLogger(__name__)
@@ -630,44 +637,80 @@ class FileParserService:
         try:
             # Load image based on URL type
             if image_url.startswith('http://') or image_url.startswith('https://'):
-                # Download from HTTP(S) URL
                 response = requests.get(image_url, timeout=30)
                 response.raise_for_status()
                 image = Image.open(io.BytesIO(response.content))
             elif image_url.startswith('/files/mineru/'):
-                # Local MinerU extracted file with prefix matching support
                 from utils.path_utils import find_mineru_file_with_prefix
-                
-                # Find file with prefix matching
+
                 img_path = find_mineru_file_with_prefix(image_url)
-                
                 if img_path is None or not img_path.exists():
-                    logger.warning(f"Local image file not found (with prefix matching): {image_url}")
+                    logger.warning(f"Local mineru image file not found: {image_url}")
                     return ""
-                
+                image = Image.open(img_path)
+            elif image_url.startswith('/files/'):
+                # Uploaded files URL -> local filesystem path under upload folder
+                from config import Config
+                relative_path = image_url.removeprefix('/files/').lstrip('/')
+                img_path = Path(Config.UPLOAD_FOLDER) / relative_path
+                if not img_path.exists():
+                    logger.warning(f"Local uploaded image file not found: {image_url} -> {img_path}")
+                    return ""
                 image = Image.open(img_path)
             else:
-                # Unsupported path type
-                logger.warning(f"Unsupported image path type: {image_url}")
-                return ""
-            
-            # Generate caption based on provider format
-            prompt = "请用一句简短的中文描述这张图片的主要内容。只返回描述文字，不要其他解释。"
-            
+                local_path = Path(image_url)
+                if local_path.exists():
+                    image = Image.open(local_path)
+                else:
+                    logger.warning(f"Local image file not found: {image_url}")
+                    return ""
+
+            # Force decode to surface image errors early (including HEIC)
+            image.load()
+        except FileNotFoundError:
+            logger.warning(f"Local image file not found: {image_url}")
+            return ""
+        except UnidentifiedImageError as e:
+            logger.warning(f"Unsupported or corrupt image file: {image_url}. {str(e)}")
+            return ""
+        except Exception as e:
+            logger.warning(f"Failed to open image for captioning: {image_url}. {str(e)}")
+            return ""
+
+        prompt = "请用一句简短的中文描述这张图片的主要内容。只返回描述文字，不要其他解释。"
+
+        # Normalize image for AI providers (RGB + downscale for very large images)
+        try:
+            img_for_ai = image
+            if img_for_ai.mode in ('RGBA', 'LA', 'P'):
+                img_for_ai = img_for_ai.convert('RGB')
+            elif img_for_ai.mode != 'RGB':
+                img_for_ai = img_for_ai.convert('RGB')
+
+            # Reduce extremely large images to avoid provider request limits
+            try:
+                max_side = 1024
+                if img_for_ai.width > max_side or img_for_ai.height > max_side:
+                    img_for_ai = img_for_ai.copy()
+                    img_for_ai.thumbnail((max_side, max_side))
+            except Exception:
+                # If resize fails, continue with original size
+                pass
+        except Exception as e:
+            logger.warning(f"Failed to normalize image for captioning: {image_url}. {str(e)}")
+            return ""
+
+        try:
             if self._provider_format == 'openai':
-                # Use OpenAI SDK format
                 client = self._get_openai_client()
                 if not client:
                     logger.warning("OpenAI client not initialized, skipping caption generation")
                     return ""
-                
-                # Encode image to base64
+
                 buffered = io.BytesIO()
-                if image.mode in ('RGBA', 'LA', 'P'):
-                    image = image.convert('RGB')
-                image.save(buffered, format="JPEG", quality=95)
+                img_for_ai.save(buffered, format="JPEG", quality=90, optimize=True)
                 base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                
+
                 response = client.chat.completions.create(
                     model=self.image_caption_model,
                     messages=[
@@ -683,25 +726,45 @@ class FileParserService:
                 )
                 caption = response.choices[0].message.content.strip()
             else:
-                # Use Gemini SDK format (default)
                 from google.genai import types
                 client = self._get_gemini_client()
                 if not client:
                     logger.warning("Gemini client not initialized, skipping caption generation")
                     return ""
-                
-                result = client.models.generate_content(
-                    model=self.image_caption_model,
-                    contents=[image, prompt],
-                    config=types.GenerateContentConfig(
-                        temperature=0.3,  # Lower temperature for more consistent captions
-                    )
-                )
-                caption = result.text.strip()
-            
+
+                # Some deployments may configure a text-only model for captioning.
+                # If we get an "INVALID_ARGUMENT" style response, retry with a known multimodal fallback.
+                tried_models: list[str] = []
+                candidate_models: list[str] = []
+                if self.image_caption_model:
+                    candidate_models.append(self.image_caption_model)
+                if 'gemini-3-flash-preview' not in candidate_models:
+                    candidate_models.append('gemini-3-flash-preview')
+
+                caption = ""
+                for m in candidate_models:
+                    if m in tried_models:
+                        continue
+                    tried_models.append(m)
+                    try:
+                        result = client.models.generate_content(
+                            model=m,
+                            contents=[img_for_ai, prompt],
+                            config=types.GenerateContentConfig(
+                                temperature=0.3,
+                            )
+                        )
+                        caption = (getattr(result, 'text', '') or '').strip()
+                        if caption and caption.upper() not in {'INVALID_ARGUMENT', 'BAD_REQUEST'}:
+                            break
+                        logger.warning(f"Gemini caption returned '{caption}' for model={m}, will retry if fallback available")
+                        caption = ""
+                    except Exception as e:
+                        logger.warning(f"Gemini caption generation failed for model={m}: {str(e)}")
+                        caption = ""
+
             return caption
-            
         except Exception as e:
-            logger.warning(f"Failed to generate caption for {image_url}: {str(e)}")
-            return ""  # Return empty string on failure
+            logger.warning(f"AI caption generation failed for {image_url}: {str(e)}")
+            return ""
 

@@ -16,6 +16,7 @@ import threading
 from models import db, ReferenceFile, Project
 from utils.response import success_response, error_response, bad_request, not_found
 from services.file_parser_service import FileParserService
+from services.ai_providers.ocr import create_baidu_accurate_ocr_provider
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,22 @@ def upload_reference_file():
         
         logger.info(f"File uploaded: {original_filename} (ID: {reference_file.id})")
         
-        # Lazy parsing: 不立即解析，等待用户选择确定后再解析
+        # Check if it's an image file
+        # NOTE: For images, we do NOT do caption/OCR at upload time.
+        # We rely on multimodal LLM at outline/blueprint generation time instead.
+        # This avoids upload blocking and avoids showing "parse failed" to users.
+        image_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic'}
+        file_ext = original_filename.split('.').pop().lower() if '.' in original_filename else ''
+        
+        if file_ext in image_extensions:
+            reference_file.parse_status = 'completed'
+            reference_file.markdown_content = ""
+            reference_file.error_message = None
+            reference_file.updated_at = datetime.utcnow()
+            db.session.commit()
+            logger.info(f"Image reference file uploaded (no caption at upload time): {original_filename}")
+        
+        # Lazy parsing: 对于文档文件，不立即解析，等待用户选择确定后再解析
         # 解析将在用户选择文件并确认时触发
         
         return success_response({'file': reference_file.to_dict()})

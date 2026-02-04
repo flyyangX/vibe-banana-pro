@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banana Slides - Generating</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text-main: #111111;
+            --text-muted: #888888;
+            --font-serif: 'Bodoni Moda', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .loader-container {
+            max-width: 600px;
+            padding: 40px;
+        }
+
+        .status-txt {
+            font-family: var(--font-serif);
+            font-size: 32px;
+            margin-bottom: 24px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 2px;
+            background: #f0f0f0;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+
+        .progress-fill {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 60%;
+            background: #000;
+            animation: progress 2s ease-in-out infinite;
+        }
+
+        @keyframes progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+
+        .console-log {
+            font-family: 'Inter', sans-serif; /* Monospace not needed for editorial vibe */
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: left;
+            border-left: 1px solid #e5e5e5;
+            padding-left: 20px;
+            height: 100px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .log-item {
+            opacity: 0;
+            animation: fadeIn 0.5s forwards;
+        }
+        
+        .log-item:nth-child(1) { animation-delay: 0.1s; }
+        .log-item:nth-child(2) { animation-delay: 0.8s; }
+        .log-item:nth-child(3) { animation-delay: 1.5s; }
+
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        /* Simulate redirect */
+        .redirect-note {
+             margin-top: 40px;
+             font-size: 12px;
+             color: #ccc;
+             cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="loader-container">
+        <h1 class="status-txt">Crafting your narrative...</h1>
+        
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+
+        <div class="console-log">
+            <div class="log-item">Analyzing outline structure...</div>
+            <div class="log-item">Generating slide layouts (Page 1 of 4)...</div>
+            <div class="log-item">Fetching imagery...</div>
+        </div>
+
+        <div class="redirect-note" onclick="window.location.href='04_editor.html'">
+            (Click to simulate completion ->)
+        </div>
+    </div>
+
+</body>
+</html>

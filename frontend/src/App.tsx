@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Home } from './pages/Home';
-import { History } from './pages/History';
-import { OutlineEditor } from './pages/OutlineEditor';
-import { DetailEditor } from './pages/DetailEditor';
-import { SlidePreview } from './pages/SlidePreview';
-import { InfographicPreview } from './pages/InfographicPreview';
-import { XhsPreview } from './pages/XhsPreview';
-import { ProjectMaterials } from './pages/ProjectMaterials';
-import { SettingsPage } from './pages/Settings';
+import { Home } from './pages/Home/index';
+import { History } from './pages/History/index';
+import { OutlineEditor } from './pages/OutlineEditor/index';
+import { DetailEditor } from './pages/DetailEditor/index';
+import { SlidePreview } from './pages/SlidePreview/index';
+import { InfographicPreview } from './pages/InfographicPreview/index';
+import { XhsPreview } from './pages/XhsPreview/index';
+import { ProjectMaterials } from './pages/ProjectMaterials/index';
+import { SettingsPage } from './pages/Settings/index';
 import { useProjectStore } from './store/useProjectStore';
 import { useToast } from './components/shared';
 

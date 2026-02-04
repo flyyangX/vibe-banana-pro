@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banana Slides - Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-canvas: #f4f4f5;
+            --bg-panel: #ffffff;
+            --border: #e5e5e5;
+            --text-main: #111111;
+            --text-muted: #666666;
+            --accent: #2563eb;
+            --font-serif: 'Bodoni Moda', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* -----------------------
+           TOP HEADER
+           ----------------------- */
+        header {
+            height: 56px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 50;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .home-icon {
+            font-family: var(--font-serif);
+            font-weight: 700;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .doc-title {
+            font-size: 13px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+        
+        .doc-title:hover { background: #f4f4f5; }
+
+        .header-center {
+            display: flex;
+            gap: 8px;
+            background: #f4f4f5;
+            padding: 4px;
+            border-radius: 6px;
+        }
+
+        .view-toggle {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+        
+        .view-toggle.active {
+            background: white;
+            color: black;
+            font-weight: 600;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .icon-btn {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .primary-btn {
+            background: black;
+            color: white;
+            padding: 0 16px;
+            height: 32px;
+            display: flex; align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* -----------------------
+           MAIN WORKSPACE
+           ----------------------- */
+        .workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Left Thumbnails */
+        .thumbnails-col {
+            width: 200px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .thumb-item {
+            cursor: pointer;
+            position: relative;
+        }
+
+        .thumb-preview {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #ddd;
+        }
+        
+        .thumb-item:hover .thumb-preview {
+            border-color: #999;
+        }
+
+        .thumb-item.active .thumb-preview {
+            border: 2px solid var(--accent);
+        }
+
+        .thumb-num {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        /* Center Canvas */
+        .canvas-area {
+            flex: 1;
+            background: var(--bg-canvas);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: radial-gradient(#ddd 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .slide-frame {
+            width: 80%;
+            aspect-ratio: 16/9;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+
+        /* Editable Elements on Canvas */
+        .editable-h1 {
+            font-family: var(--font-serif);
+            font-size: 48px;
+            line-height: 1.1;
+            border: 1px dashed transparent;
+            margin-bottom: 24px;
+        }
+        
+        .editable-h1:hover { border-color: var(--accent); }
+
+        .editable-p {
+             font-size: 16px;
+             color: var(--text-muted);
+             line-height: 1.6;
+             max-width: 600px;
+             border: 1px dashed transparent;
+        }
+        
+        .editable-p:hover { border-color: var(--accent); }
+
+        .visual-placeholder {
+            position: absolute;
+            right: 60px;
+            top: 60px;
+            bottom: 60px;
+            width: 300px;
+            background: #f9f9f9;
+            border: 1px dashed #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ccc;
+            font-size: 12px;
+        }
+
+        /* Toolbar overlay */
+        .floating-tools {
+            position: absolute;
+            bottom: 32px;
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 8px;
+            border: 1px solid var(--border);
+            z-index: 40;
+        }
+        
+        .tool-btn {
+            width: 36px; height: 36px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        
+        .tool-btn:hover { background: #f4f4f5; }
+
+        /* Right Properties */
+        .props-panel {
+            width: 280px;
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .props-header {
+            padding: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .props-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .prop-item label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .prop-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            font-size: 13px;
+        }
+
+        .color-row {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .color-swatch {
+            width: 24px; height: 24px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <div class="home-icon" onclick="window.location.href='01_home.html'">B.</div>
+            <div class="doc-title">TFT History Presentation</div>
+        </div>
+
+        <div class="header-center">
+            <div class="view-toggle active">Slide</div>
+            <div class="view-toggle">Grid</div>
+        </div>
+
+        <div class="header-right">
+            <div class="icon-btn">▶</div>
+            <div class="primary-btn">Share</div>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <!-- Thumbnails -->
+        <aside class="thumbnails-col">
+            <div class="thumb-item active">
+                <span class="thumb-num">1</span>
+                <div class="thumb-preview">Cover</div>
+            </div>
+            <div class="thumb-item">
+                <span class="thumb-num">2</span>
+                <div class="thumb-preview">Intro</div>
+            </div>
+            <div class="thumb-item">
+                <span class="thumb-num">3</span>
+                <div class="thumb-preview">Body</div>
+            </div>
+            <div class="thumb-item">
+                <span class="thumb-num">4</span>
+                <div class="thumb-preview">Body</div>
+            </div>
+        </aside>
+
+        <!-- Canvas -->
+        <main class="canvas-area">
+            <div class="slide-frame">
+                <h1 class="editable-h1">Origin & Birth</h1>
+                <p class="editable-p">How a community mod transformed into a standalone genre leader.</p>
+                
+                <div class="visual-placeholder">
+                    [ AI Generated Image ]
+                </div>
+            </div>
+
+            <div class="floating-tools">
+                <div class="tool-btn">T</div>
+                <div class="tool-btn">Img</div>
+                <div class="tool-btn">Shp</div>
+                <div style="width:1px; background:#ddd; margin:0 4px;"></div>
+                <div class="tool-btn">✨</div>
+            </div>
+        </main>
+
+        <!-- Properties -->
+        <aside class="props-panel">
+            <div class="props-header">Design Actions</div>
+            <div class="props-body">
+                <div class="prop-item">
+                    <label>Layout</label>
+                    <select class="prop-select">
+                        <option>Title & Content</option>
+                        <option>Cover</option>
+                        <option>Split</option>
+                    </select>
+                </div>
+
+                <div class="prop-item">
+                    <label>Theme</label>
+                    <div class="color-row">
+                        <div class="color-swatch" style="background:#000;"></div>
+                        <div class="color-swatch" style="background:#2563eb;"></div>
+                        <div class="color-swatch" style="background:#f59e0b;"></div>
+                        <div class="color-swatch" style="background:#fff;"></div>
+                    </div>
+                </div>
+
+                 <div class="prop-item">
+                    <label>AI Tools</label>
+                    <button class="prop-select" style="text-align:left; cursor:pointer;">✨ Remixture Slide</button>
+                    <button class="prop-select" style="text-align:left; margin-top:8px; cursor:pointer;">🖼 Regenerate Image</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+</body>
+</html>

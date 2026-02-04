@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banana Slides - Home</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text-main: #111111;
+            --text-muted: #666666;
+            --border: #e5e5e5;
+            --accent: #000000; /* Main accent is black in light mode for starkness */
+            --accent-active: #2563eb; /* Electric blue for interaction */
+            --font-serif: 'Bodoni Moda', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Nav */
+        header {
+            padding: 24px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid transparent; /* Hidden initially */
+        }
+
+        .brand {
+            font-family: var(--font-serif);
+            font-weight: 700;
+            font-size: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        .user-nav {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .nav-link {
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        
+        .nav-link:hover { color: var(--text-main); }
+
+        .avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: #eee;
+        }
+
+        /* Main Center Stage */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 100px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .hero-title {
+            font-family: var(--font-serif);
+            font-size: 64px;
+            font-weight: 400;
+            line-height: 1.1;
+            text-align: center;
+            margin-bottom: 40px;
+            color: var(--text-main);
+        }
+
+        .hero-title span {
+            font-style: italic;
+            color: var(--text-muted);
+        }
+
+        /* Input Card mimic */
+        .input-container {
+            width: 100%;
+            position: relative;
+        }
+
+        .input-box {
+            width: 100%;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 0; /* Sharp corners */
+            padding: 32px;
+            font-family: var(--font-serif);
+            font-size: 24px;
+            color: var(--text-main);
+            min-height: 160px;
+            resize: none;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+
+        .input-box:focus {
+            border-color: var(--accent);
+        }
+
+        .input-box::placeholder {
+            color: #ddd;
+        }
+
+        .action-bar {
+            margin-top: -2px; /* Connect with input */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+        }
+
+        .attachment-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+        
+        .attachment-btn:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+        }
+
+        .submit-btn {
+            background: var(--text-main);
+            color: white;
+            border: none;
+            padding: 16px 40px;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .submit-btn:hover {
+            background: var(--accent-active);
+        }
+
+        /* Quick Starters */
+        .starters-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 60px;
+            width: 100%;
+        }
+
+        .starter-card {
+            border: 1px solid var(--border);
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .starter-card:hover {
+            border-color: var(--text-main);
+            transform: translateY(-2px);
+        }
+
+        .starter-icon {
+            font-size: 20px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .starter-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .starter-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">Banana</div>
+        <div class="user-nav">
+            <span class="nav-link">My Projects</span>
+            <span class="nav-link">Templates</span>
+            <div class="avatar"></div>
+        </div>
+    </header>
+
+    <main>
+        <h1 class="hero-title">What story<br><span>are we telling today?</span></h1>
+
+        <div class="input-container">
+            <textarea class="input-box" placeholder="Describe your presentation idea..."></textarea>
+            
+            <div class="action-bar">
+                <div class="attachment-btn">
+                    <span>+ Upload Reference</span>
+                </div>
+                <button class="submit-btn" onclick="window.location.href='02_outline.html'">
+                    Generate Outline ->
+                </button>
+            </div>
+        </div>
+
+        <div class="starters-grid">
+            <div class="starter-card">
+                <span class="starter-icon">📊</span>
+                <div class="starter-title">Pitch Deck</div>
+                <div class="starter-desc">Clean, professional slides for your next big funding round.</div>
+            </div>
+            
+            <div class="starter-card">
+                <span class="starter-icon">🎓</span>
+                <div class="starter-title">Lecture</div>
+                <div class="starter-desc">Educational content structured for maximum retention.</div>
+            </div>
+
+            <div class="starter-card">
+                <span class="starter-icon">📱</span>
+                <div class="starter-title">Social Post</div>
+                <div class="starter-desc">Vertical carousels optimized for Xiaohongshu.</div>
+            </div>
+        </div>
+
+    </main>
+
+</body>
+</html>

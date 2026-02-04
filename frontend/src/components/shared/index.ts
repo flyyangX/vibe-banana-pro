@@ -10,16 +10,19 @@ export { ContextualStatusBadge } from './ContextualStatusBadge';
 export { ConfirmDialog, useConfirm } from './ConfirmDialog';
 export { MaterialGeneratorModal } from './MaterialGeneratorModal';
 export { ReferenceFileCard } from './ReferenceFileCard';
-export { ReferenceFileSelector } from './ReferenceFileSelector';
+export { ReferenceFileSelector } from './ReferenceFileSelector/index';
 export { FilePreviewModal } from './FilePreviewModal';
 export { ReferenceFileList } from './ReferenceFileList';
-export { MaterialSelector } from './MaterialSelector';
+export { MaterialSelector } from './MaterialSelector/index';
 export { Markdown } from './Markdown';
 export { AiRefineInput } from './AiRefineInput';
 export { ShimmerOverlay } from './ShimmerOverlay';
 export { ImagePreviewList } from './ImagePreviewList';
+export { MaterialPreviewList } from './MaterialPreviewList';
 export { ProjectResourcesList } from './ProjectResourcesList';
 export { ProjectSettingsModal } from './ProjectSettingsModal';
 export { ExportTasksPanel } from './ExportTasksPanel';
-
+export { TemplateSelector, getTemplateFile, presetTemplates } from './TemplateSelector/index';
+export { PageEditModal } from './PageEditModal';
+export type { TemplateUsageMode } from './PageEditModal';
 

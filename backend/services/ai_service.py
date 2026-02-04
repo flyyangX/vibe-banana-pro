@@ -8,7 +8,7 @@ import json
 import re
 import logging
 import requests
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 from textwrap import dedent
 from PIL import Image
 from tenacity import retry, stop_after_attempt, retry_if_exception_type
@@ -32,6 +32,68 @@ from .ai_providers import get_text_provider, get_image_provider, TextProvider, I
 from config import get_config
 
 logger = logging.getLogger(__name__)
+
+_JSON_CODEBLOCK_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
+
+
+def _extract_json_candidate(text: str) -> str:
+    """
+    Best-effort extract JSON from LLM output.
+
+    Supports:
+    - Pure JSON
+    - Markdown fenced blocks (```json ... ```)
+    - Explanatory text before/after JSON
+    - JSON that is a list or object
+    """
+    if not text:
+        return ""
+    raw = text.strip()
+
+    # 1) Prefer the first fenced code block content (json or not).
+    m = _JSON_CODEBLOCK_RE.search(raw)
+    if m:
+        candidate = (m.group(1) or "").strip()
+        if candidate:
+            return candidate
+
+    # 2) If raw itself looks like JSON, return as-is.
+    if (raw.startswith("{") and raw.endswith("}")) or (raw.startswith("[") and raw.endswith("]")):
+        return raw
+
+    # 3) Otherwise, try to find the first JSON object/array span.
+    # We scan for the first '{' or '[' and then find a matching closing brace/bracket
+    # while respecting quoted strings and escapes.
+    start_positions = [pos for pos in (raw.find("["), raw.find("{")) if pos != -1]
+    if not start_positions:
+        return raw
+    start = min(start_positions)
+    opener = raw[start]
+    closer = "]" if opener == "[" else "}"
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                return raw[start : i + 1].strip()
+    # Fallback: return tail from the first opener
+    return raw[start:].strip()
 
 
 class ProjectContext:
@@ -215,10 +277,8 @@ class AIService:
         # 调用AI生成文本（根据 enable_text_reasoning 配置调整 thinking_budget）
         actual_budget = self._get_text_thinking_budget()
         response_text = self.text_provider.generate_text(prompt, thinking_budget=actual_budget)
-        
-        # 清理响应文本：移除markdown代码块标记和多余空白
-        cleaned_text = response_text.strip().strip("```json").strip("```").strip()
-        
+
+        cleaned_text = _extract_json_candidate(response_text)
         try:
             return json.loads(cleaned_text)
         except json.JSONDecodeError as e:
@@ -263,13 +323,50 @@ class AIService:
         else:
             raise ValueError("text_provider 不支持图片输入")
         
-        # 清理响应文本：移除markdown代码块标记和多余空白
-        cleaned_text = response_text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        cleaned_text = _extract_json_candidate(response_text)
         
         try:
             return json.loads(cleaned_text)
         except json.JSONDecodeError as e:
             logger.warning(f"JSON解析失败（带图片），将重新生成。原始文本: {cleaned_text[:200]}... 错误: {str(e)}")
+            raise
+
+    @retry(
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type((json.JSONDecodeError, ValueError)),
+        reraise=True
+    )
+    def generate_json_with_images(self, prompt: str, image_paths: List[str], thinking_budget: int = 1000) -> Union[Dict, List]:
+        """
+        Generate JSON with multiple image inputs.
+        Requires text_provider to support multimodal images.
+        """
+        actual_budget = self._get_text_thinking_budget()
+        image_paths = [p for p in (image_paths or []) if p]
+
+        if not image_paths:
+            # Fallback to text-only
+            response_text = self.text_provider.generate_text(prompt, thinking_budget=actual_budget)
+        elif hasattr(self.text_provider, 'generate_text_with_images'):
+            response_text = self.text_provider.generate_text_with_images(
+                prompt=prompt,
+                images=image_paths,
+                thinking_budget=actual_budget
+            )
+        elif hasattr(self.text_provider, 'generate_with_image') and len(image_paths) == 1:
+            response_text = self.text_provider.generate_with_image(
+                prompt=prompt,
+                image_path=image_paths[0],
+                thinking_budget=actual_budget
+            )
+        else:
+            raise ValueError("text_provider 不支持多图输入")
+
+        cleaned_text = _extract_json_candidate(response_text)
+        try:
+            return json.loads(cleaned_text)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON解析失败（多图），将重新生成。原始文本: {cleaned_text[:200]}... 错误: {str(e)}")
             raise
     
     @staticmethod
@@ -314,7 +411,7 @@ class AIService:
             logger.error(f"Failed to download image from {url}: {str(e)}")
             return None
     
-    def generate_outline(self, project_context: ProjectContext, language: str = None) -> List[Dict]:
+    def generate_outline(self, project_context: ProjectContext, language: str = None, page_count: int | None = None) -> List[Dict]:
         """
         Generate PPT outline from idea prompt
         Based on demo.py gen_outline()
@@ -325,7 +422,7 @@ class AIService:
         Returns:
             List of outline items (may contain parts with pages or direct pages)
         """
-        outline_prompt = get_outline_generation_prompt(project_context, language)
+        outline_prompt = get_outline_generation_prompt(project_context, language, page_count)
         outline = self.generate_json(outline_prompt, thinking_budget=1000)
         return outline
     

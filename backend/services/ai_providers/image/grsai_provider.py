@@ -180,7 +180,7 @@ class GRSAIImageProvider(ImageProvider):
             # Poll for result
             result_url = f"{self.api_base}/v1/draw/result"
             max_polls = 60  # Poll for up to 60 times (5 minutes total if 5s interval)
-            poll_interval = 5  # Poll every 5 seconds
+            poll_interval = 2  # Poll every 2 seconds
             
             for i in range(max_polls):
                 time.sleep(poll_interval)

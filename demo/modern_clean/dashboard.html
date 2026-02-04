@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banana Slides - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Palette: Modern Clean Light */
+            --bg-page: #FFFFFF;
+            --bg-surface: #FFFFFF;
+            --bg-surface-hover: #F9FAFB;
+            --bg-muted: #F3F4F6;
+            
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --text-tertiary: #9CA3AF;
+            
+            --border-subtle: #E5E7EB;
+            --border-focus: #111827;
+            
+            --primary: #111827;
+            --primary-foreground: #FFFFFF;
+            
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+            
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Elements */
+        header {
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .brand {
+            font-weight: 600;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        
+        .brand span.icon { 
+            background: #FFE033;
+            width: 24px; height: 24px; 
+            border-radius: 6px; 
+            display: block; 
+        }
+
+        nav { display: flex; gap: 32px; }
+        nav a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav a:hover, nav a.active { color: var(--text-primary); }
+
+        .user-menu { display: flex; align-items: center; gap: 16px; }
+        .avatar {
+            width: 32px; height: 32px;
+            border-radius: var(--radius-full);
+            background-color: var(--bg-muted);
+            border: 1px solid var(--border-subtle);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 600;
+        }
+
+        main {
+            flex: 1;
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        h2 { font-size: 24px; font-weight: 600; }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: var(--primary-foreground);
+            padding: 10px 20px;
+            border-radius: var(--radius-full);
+            font-weight: 500;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+
+        /* Grid */
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .project-card {
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            transition: all 0.2s;
+            cursor: pointer;
+            background: var(--bg-surface);
+            display: flex;
+            flex-direction: column;
+            aspect-ratio: 4/3;
+        }
+
+        .project-card:hover {
+            border-color: var(--border-focus);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .card-preview {
+            flex: 1;
+            background-color: var(--bg-muted);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            font-size: 40px;
+        }
+
+        .card-info {
+            padding: 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background-color: #10B981; /* Green for published */
+        }
+        .status-badge.draft { background-color: #F59E0B; } /* Orange for draft */
+
+        /* Add New Card */
+        .add-card {
+            border: 1px dashed var(--border-subtle);
+            background: transparent;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-secondary);
+        }
+        .add-card:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+            background: var(--bg-surface-hover);
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="index.html" class="brand">
+            <span class="icon"></span>
+            Banana
+        </a>
+        <nav>
+            <a href="index.html">Create</a>
+            <a href="#" class="active">Projects</a>
+            <a href="#">Templates</a>
+        </nav>
+        <div class="user-menu">
+            <div class="avatar">XY</div>
+        </div>
+    </header>
+
+    <main>
+        <div class="page-header">
+            <h2>Recent Projects</h2>
+            <a href="index.html" class="btn-primary">
+                + New Presentation
+            </a>
+        </div>
+
+        <div class="project-grid">
+            <!-- Add New -->
+            <div class="project-card add-card" onclick="window.location.href='index.html'">
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">+</div>
+                    <div style="font-size: 14px; font-weight: 500;">Create New</div>
+                </div>
+            </div>
+
+            <!-- Card 1 -->
+            <div class="project-card" onclick="window.location.href='editor.html'">
+                <div class="card-preview">📊</div>
+                <div class="card-info">
+                    <div class="card-title">Q3 Financial Report</div>
+                    <div class="card-meta">
+                        <span>Edited 2h ago</span>
+                        <span class="status-badge" title="Published"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="project-card" onclick="window.location.href='editor.html'">
+                <div class="card-preview">🌱</div>
+                <div class="card-info">
+                    <div class="card-title">Eco-Friendly Initiative</div>
+                    <div class="card-meta">
+                        <span>Edited yesterday</span>
+                        <span class="status-badge draft" title="Draft"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="project-card" onclick="window.location.href='editor.html'">
+                <div class="card-preview">🚀</div>
+                <div class="card-info">
+                    <div class="card-title">Product Launch Strategy</div>
+                    <div class="card-meta">
+                        <span>Edited 3 days ago</span>
+                        <span class="status-badge draft" title="Draft"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Card 4 -->
+            <div class="project-card" onclick="window.location.href='editor.html'">
+                <div class="card-preview">🎓</div>
+                <div class="card-info">
+                    <div class="card-title">Machine Learning 101</div>
+                    <div class="card-meta">
+                        <span>Edited 1 week ago</span>
+                        <span class="status-badge" title="Published"></span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

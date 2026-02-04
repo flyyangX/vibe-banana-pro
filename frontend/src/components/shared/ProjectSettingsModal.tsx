@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, FileText, Settings as SettingsIcon, Download, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button, Textarea } from '@/components/shared';
-import { Settings } from '@/pages/Settings';
+import { Settings } from '@/pages/Settings/index';
 import type { ExportExtractorMethod, ExportInpaintMethod } from '@/types';
 
 interface ProjectSettingsModalProps {

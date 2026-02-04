@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -64,6 +64,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 // Hook for easy confirmation dialogs
 export const useConfirm = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const promiseResolveRef = useRef<((value: boolean) => void) | null>(null);
   const [config, setConfig] = useState<{
     message: string;
     title?: string;
@@ -73,33 +74,68 @@ export const useConfirm = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  const confirm = useCallback(
-    (
-      message: string,
-      onConfirm: () => void,
-      options?: {
+  /**
+   * 支持两种调用方式：
+   * 1) confirm("message", onConfirm, options?)  —— 旧式回调
+   * 2) await confirm({ title, message, confirmText, cancelText, variant }) —— Promise<boolean>
+   */
+  const confirm = useCallback((arg1: any, arg2?: any, arg3?: any) => {
+    // Promise style
+    if (typeof arg1 === 'object' && arg1 && typeof arg1.message === 'string') {
+      const options = arg1 as {
         title?: string;
+        message: string;
         confirmText?: string;
         cancelText?: string;
         variant?: 'danger' | 'warning' | 'info';
-      }
-    ) => {
-      setConfig({
-        message,
-        onConfirm,
-        title: options?.title,
-        confirmText: options?.confirmText,
-        cancelText: options?.cancelText,
-        variant: options?.variant || 'warning',
+      };
+      return new Promise<boolean>((resolve) => {
+        promiseResolveRef.current = resolve;
+        setConfig({
+          message: options.message,
+          title: options.title,
+          confirmText: options.confirmText,
+          cancelText: options.cancelText,
+          variant: options.variant || 'warning',
+          onConfirm: () => {
+            promiseResolveRef.current = null;
+            resolve(true);
+          },
+        });
+        setIsOpen(true);
       });
-      setIsOpen(true);
-    },
-    []
-  );
+    }
+
+    // Callback style
+    const message = String(arg1 || '');
+    const onConfirm = typeof arg2 === 'function' ? (arg2 as () => void) : () => {};
+    const options = (arg3 || {}) as {
+      title?: string;
+      confirmText?: string;
+      cancelText?: string;
+      variant?: 'danger' | 'warning' | 'info';
+    };
+
+    promiseResolveRef.current = null;
+    setConfig({
+      message,
+      onConfirm,
+      title: options.title,
+      confirmText: options.confirmText,
+      cancelText: options.cancelText,
+      variant: options.variant || 'warning',
+    });
+    setIsOpen(true);
+    return undefined;
+  }, []);
 
   const close = useCallback(() => {
     setIsOpen(false);
     setConfig(null);
+    if (promiseResolveRef.current) {
+      promiseResolveRef.current(false);
+      promiseResolveRef.current = null;
+    }
   }, []);
 
   const handleConfirm = useCallback(() => {

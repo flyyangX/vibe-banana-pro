@@ -5,6 +5,7 @@ import json
 import logging
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import desc
@@ -13,6 +14,7 @@ from werkzeug.exceptions import BadRequest
 
 from models import db, Project, Page, Task, ReferenceFile, Material, XhsCardImageVersion
 from services import ProjectContext
+from services.project_service import ProjectService
 from services.ai_service_manager import get_ai_service, get_cached_refined_template_style
 from services.task_manager import (
     task_manager,
@@ -34,130 +36,22 @@ logger = logging.getLogger(__name__)
 project_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
 
 
-def _get_project_reference_files_content(project_id: str) -> list:
-    """
-    Get reference files content for a project
-    
-    Args:
-        project_id: Project ID
-        
-    Returns:
-        List of dicts with 'filename' and 'content' keys
-    """
-    reference_files = ReferenceFile.query.filter_by(
-        project_id=project_id,
-        parse_status='completed'
-    ).all()
-    
-    files_content = []
-    for ref_file in reference_files:
-        if ref_file.markdown_content:
-            files_content.append({
-                'filename': ref_file.filename,
-                'content': ref_file.markdown_content
-            })
-    
-    return files_content
-
-
-def _reconstruct_outline_from_pages(pages: list) -> list:
-    """
-    Reconstruct outline structure from Page objects
-    
-    Args:
-        pages: List of Page objects ordered by order_index
-        
-    Returns:
-        Outline structure (list) with optional part grouping
-    """
-    outline = []
-    current_part = None
-    current_part_pages = []
-    
-    for page in pages:
-        outline_content = page.get_outline_content()
-        if not outline_content:
-            continue
-            
-        page_data = outline_content.copy()
-        
-        # 如果当前页面属于一个 part
-        if page.part:
-            # 如果这是新的 part，先保存之前的 part（如果有）
-            if current_part and current_part != page.part:
-                outline.append({
-                    "part": current_part,
-                    "pages": current_part_pages
-                })
-                current_part_pages = []
-            
-            current_part = page.part
-            # 移除 part 字段，因为它在顶层
-            if 'part' in page_data:
-                del page_data['part']
-            current_part_pages.append(page_data)
-        else:
-            # 如果当前页面不属于任何 part，先保存之前的 part（如果有）
-            if current_part:
-                outline.append({
-                    "part": current_part,
-                    "pages": current_part_pages
-                })
-                current_part = None
-                current_part_pages = []
-            
-            # 直接添加页面
-            outline.append(page_data)
-    
-    # 保存最后一个 part（如果有）
-    if current_part:
-        outline.append({
-            "part": current_part,
-            "pages": current_part_pages
-        })
-    
-    return outline
-
-
 @project_bp.route('', methods=['GET'])
 def list_projects():
     """
     GET /api/projects - Get all projects (for history)
-    
+
     Query params:
     - limit: number of projects to return (default: 50, max: 100)
     - offset: offset for pagination (default: 0)
     """
     try:
-        # Parameter validation
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
-        
-        # Enforce limits to prevent performance issues
-        limit = min(max(1, limit), 100)  # Between 1-100
-        offset = max(0, offset)  # Non-negative
-        
-        # Fetch limit + 1 items to check for more pages efficiently
-        # This avoids a second database query
-        projects_with_extra = Project.query\
-            .options(joinedload(Project.pages))\
-            .order_by(desc(Project.updated_at))\
-            .limit(limit + 1)\
-            .offset(offset)\
-            .all()
-        
-        # Check if there are more items beyond the current page
-        has_more = len(projects_with_extra) > limit
-        # Return only the requested limit
-        projects = projects_with_extra[:limit]
-        
-        return success_response({
-            'projects': [project.to_dict(include_pages=True) for project in projects],
-            'has_more': has_more,
-            'limit': limit,
-            'offset': offset
-        })
-    
+
+        result = ProjectService.list_projects(limit=limit, offset=offset)
+        return success_response(result)
+
     except Exception as e:
         logger.error(f"list_projects failed: {str(e)}", exc_info=True)
         return error_response('SERVER_ERROR', str(e), 500)
@@ -179,43 +73,26 @@ def create_project():
     """
     try:
         data = request.get_json()
-        
+
         if not data:
             return bad_request("Request body is required")
-        
+
         # creation_type is required
         if 'creation_type' not in data:
             return bad_request("creation_type is required")
-        
-        creation_type = data.get('creation_type')
-        
-        if creation_type not in ['idea', 'outline', 'descriptions']:
-            return bad_request("Invalid creation_type")
-        
-        product_type = (data.get('product_type') or 'ppt').strip().lower()
-        if product_type not in ['ppt', 'infographic', 'xiaohongshu']:
-            return bad_request("Invalid product_type")
 
-        # Create project
-        project = Project(
-            creation_type=creation_type,
-            idea_prompt=data.get('idea_prompt'),
-            outline_text=data.get('outline_text'),
-            description_text=data.get('description_text'),
-            template_style=data.get('template_style'),
-            product_type=product_type,
-            status='DRAFT'
-        )
-        
-        db.session.add(project)
-        db.session.commit()
-        
+        project = ProjectService.create_project(data)
+
         return success_response({
             'project_id': project.id,
             'status': project.status,
             'pages': []
         }, status_code=201)
-    
+
+    except ValueError as e:
+        db.session.rollback()
+        return bad_request(str(e))
+
     except BadRequest as e:
         # Handle JSON parsing errors (invalid JSON body)
         db.session.rollback()
@@ -271,51 +148,11 @@ def update_project(project_id):
         
         if not project:
             return not_found('Project')
-        
+
         data = request.get_json()
-        
-        # Update idea_prompt if provided
-        if 'idea_prompt' in data:
-            project.idea_prompt = data['idea_prompt']
-        
-        # Update extra_requirements if provided
-        if 'extra_requirements' in data:
-            project.extra_requirements = data['extra_requirements']
-        
-        # Update template_style if provided
-        if 'template_style' in data:
-            project.template_style = data['template_style']
 
-        # Update product_payload if provided
-        if 'product_payload' in data:
-            project.product_payload = data['product_payload']
+        project = ProjectService.update_project(project, data)
 
-        # Update export settings if provided
-        if 'export_extractor_method' in data:
-            project.export_extractor_method = data['export_extractor_method']
-        if 'export_inpaint_method' in data:
-            project.export_inpaint_method = data['export_inpaint_method']
-        
-        # Update page order if provided
-        if 'pages_order' in data:
-            pages_order = data['pages_order']
-            # Optimization: batch query all pages to update, avoiding N+1 queries
-            pages_to_update = Page.query.filter(
-                Page.id.in_(pages_order),
-                Page.project_id == project_id
-            ).all()
-            
-            # Create page_id -> page mapping for O(1) lookup
-            pages_map = {page.id: page for page in pages_to_update}
-            
-            # Batch update order
-            for index, page_id in enumerate(pages_order):
-                if page_id in pages_map:
-                    pages_map[page_id].order_index = index
-        
-        project.updated_at = datetime.utcnow()
-        db.session.commit()
-        
         return success_response(project.to_dict(include_pages=True))
     
     except Exception as e:
@@ -331,44 +168,13 @@ def delete_project(project_id):
     """
     try:
         project = Project.query.get(project_id)
-        
+
         if not project:
             return not_found('Project')
 
-        # Delete project-scoped reference files (DB rows + disk files).
-        # NOTE: Reference files are stored under uploads/reference_files (not under project dir),
-        # so FileService.delete_project_files() won't remove them.
-        try:
-            from pathlib import Path
-            from models import ReferenceFile
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        ProjectService.delete_project(project, upload_folder)
 
-            upload_folder = current_app.config['UPLOAD_FOLDER']
-            reference_files = ReferenceFile.query.filter_by(project_id=project_id).all()
-            for rf in reference_files:
-                # Best-effort disk cleanup
-                try:
-                    file_path = Path(upload_folder) / rf.file_path
-                    if file_path.exists():
-                        file_path.unlink()
-                except Exception as file_err:
-                    logger.warning(
-                        f"Failed to delete reference file from disk (id={rf.id}): {file_err}"
-                    )
-
-                db.session.delete(rf)
-        except Exception as ref_err:
-            # Do not block project deletion if reference files cleanup fails
-            logger.warning(f"Reference files cleanup failed: {ref_err}", exc_info=True)
-        
-        # Delete project files
-        from services import FileService
-        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
-        file_service.delete_project_files(project_id)
-        
-        # Delete project from database (cascade will delete pages and tasks)
-        db.session.delete(project)
-        db.session.commit()
-        
         return success_response(message="Project deleted successfully")
     
     except Exception as e:
@@ -403,9 +209,17 @@ def generate_outline(project_id):
         # Get request data and language parameter
         data = request.get_json() or {}
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+        page_count = data.get('page_count')
+        if page_count is not None:
+            try:
+                page_count = int(page_count)
+            except Exception:
+                return bad_request("page_count must be an integer")
+            if page_count < 1:
+                return bad_request("page_count must be greater than 0")
         
-        # Get reference files content and create project context
-        reference_files_content = _get_project_reference_files_content(project_id)
+        # Get reference files content and create project context (documents -> parsed text)
+        reference_files_content = ProjectService.get_project_reference_files_content(project_id)
         if reference_files_content:
             logger.info(f"Found {len(reference_files_content)} reference files for project {project_id}")
             for rf in reference_files_content:
@@ -435,8 +249,21 @@ def generate_outline(project_id):
             project.idea_prompt = idea_prompt
             
             # Create project context and generate outline from idea
+            asset_summaries = ProjectService.get_project_asset_material_summaries(project_id, max_items=10)
+            if asset_summaries:
+                reference_files_content = reference_files_content + asset_summaries
             project_context = ProjectContext(project, reference_files_content)
-            outline = ai_service.generate_outline(project_context, language=language)
+
+            # Unified multimodal outline generation:
+            # If the project has image attachments (materials asset / image reference files),
+            # pass them to the LLM directly so it can "see" the images.
+            image_paths = ProjectService.collect_project_outline_image_attachments(project_id, max_images=10)
+            if image_paths:
+                from services.prompts import get_outline_generation_prompt
+                prompt = get_outline_generation_prompt(project_context, language, page_count)
+                outline = ai_service.generate_json_with_images(prompt, image_paths, thinking_budget=1000)
+            else:
+                outline = ai_service.generate_outline(project_context, language=language, page_count=page_count)
         
         # Flatten outline to pages
         pages_data = ai_service.flatten_outline(outline)
@@ -524,7 +351,7 @@ def generate_from_description(project_id):
         ai_service = get_ai_service()
         
         # Get reference files content and create project context
-        reference_files_content = _get_project_reference_files_content(project_id)
+        reference_files_content = ProjectService.get_project_reference_files_content(project_id)
         project_context = ProjectContext(project, reference_files_content)
         
         logger.info(f"开始从描述生成大纲和页面描述: 项目 {project_id}")
@@ -630,7 +457,7 @@ def generate_descriptions(project_id):
             return bad_request("No pages found for project")
         
         # Reconstruct outline from pages with part structure
-        outline = _reconstruct_outline_from_pages(pages)
+        outline = ProjectService.reconstruct_outline_from_pages(pages)
         
         data = request.get_json() or {}
         # 从配置中读取默认并发数，如果请求中提供了则使用请求的值
@@ -656,7 +483,7 @@ def generate_descriptions(project_id):
         ai_service = get_ai_service()
         
         # Get reference files content and create project context
-        reference_files_content = _get_project_reference_files_content(project_id)
+        reference_files_content = ProjectService.get_project_reference_files_content(project_id)
         project_context = ProjectContext(project, reference_files_content)
         
         # Get app instance for background task
@@ -745,7 +572,7 @@ def generate_images(project_id):
                 use_template = bool(use_template)
         
         # Reconstruct outline from pages with part structure
-        outline = _reconstruct_outline_from_pages(pages)
+        outline = ProjectService.reconstruct_outline_from_pages(pages)
         
         # 从配置中读取默认并发数，如果请求中提供了则使用请求的值
         max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 8))
@@ -774,7 +601,7 @@ def generate_images(project_id):
         effective_template_style = (project.template_style or "").strip()
 
         if no_template_mode:
-            reference_files_content = _get_project_reference_files_content(project_id)
+            reference_files_content = ProjectService.get_project_reference_files_content(project_id)
             project_context = ProjectContext(project, reference_files_content)
             outline_text = project.outline_text or ai_service.generate_outline_text(outline)
 
@@ -882,7 +709,7 @@ def generate_infographic(project_id):
         if mode == 'series' and not pages:
             return bad_request("No pages found for project")
 
-        outline = _reconstruct_outline_from_pages(pages) if pages else []
+        outline = ProjectService.reconstruct_outline_from_pages(pages) if pages else []
 
         # Defaults
         aspect_ratio = data.get('aspect_ratio') or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
@@ -1350,6 +1177,101 @@ def set_xhs_card_current_version(project_id, index: int, version_id: str):
         return error_response('SERVER_ERROR', str(e), 500)
 
 
+@project_bp.route('/<project_id>/xhs/cards/<int:index>/materials', methods=['POST'])
+def update_xhs_card_materials(project_id, index: int):
+    """
+    POST /api/projects/{project_id}/xhs/cards/{index}/materials - Update material plan for a single XHS card
+
+    Request body:
+    {
+        "material_ids": ["..."],
+        "locked": true/false
+    }
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+        if project.product_type != 'xiaohongshu':
+            return bad_request("Project is not xiaohongshu type")
+
+        data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return bad_request("Invalid request body")
+
+        material_ids = data.get('material_ids', [])
+        if material_ids is None:
+            material_ids = []
+        if not isinstance(material_ids, list):
+            return bad_request("material_ids must be a list")
+        material_ids = [str(mid) for mid in material_ids if mid]
+        locked = bool(data.get('locked', False))
+
+        pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()
+        if not pages:
+            return bad_request("No pages found for project")
+        image_count = len(pages)
+
+        payload = {}
+        if project.product_payload:
+            try:
+                payload = json.loads(project.product_payload)
+            except Exception:
+                payload = {}
+
+        payload_image_count = payload.get("image_count")
+        try:
+            payload_image_count = int(payload_image_count)
+        except Exception:
+            payload_image_count = None
+        if payload_image_count and payload_image_count > 0:
+            image_count = payload_image_count
+
+        if index < 0 or index >= image_count:
+            return bad_request("index out of range")
+
+        if material_ids:
+            materials = Material.query.filter(
+                Material.project_id == project_id,
+                Material.id.in_(material_ids)
+            ).all()
+            if len(materials) != len(set(material_ids)):
+                return bad_request("material_ids contain invalid material")
+
+        material_plan = payload.get("material_plan") if isinstance(payload.get("material_plan"), list) else []
+        normalized_plan = []
+        for i in range(image_count):
+            entry = material_plan[i] if i < len(material_plan) and isinstance(material_plan[i], dict) else {}
+            entry = dict(entry)
+            entry.setdefault("index", i)
+            entry.setdefault("material_ids", [])
+            entry.setdefault("locked", False)
+            entry.setdefault("reason", entry.get("reason") or "manual_update")
+            normalized_plan.append(entry)
+
+        normalized_plan[index] = {
+            "index": index,
+            "material_ids": material_ids,
+            "locked": locked,
+            "reason": "manual_update" if material_ids else "manual_clear"
+        }
+
+        payload.update({
+            "product_type": payload.get("product_type") or "xiaohongshu",
+            "mode": payload.get("mode") or "vertical_carousel",
+            "image_count": image_count,
+            "material_plan": normalized_plan,
+        })
+        project.product_payload = json.dumps(payload, ensure_ascii=False)
+        project.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return success_response({"product_payload": project.product_payload})
+    except Exception as e:
+        db.session.rollback()
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
 @project_bp.route('/<project_id>/generate/xhs/blueprint', methods=['POST'])
 def generate_xhs_blueprint(project_id):
     """
@@ -1375,7 +1297,7 @@ def generate_xhs_blueprint(project_id):
         image_count = len(pages)
 
         ai_service = get_ai_service()
-        reference_files_content = _get_project_reference_files_content(project_id)
+        reference_files_content = ProjectService.get_project_reference_files_content(project_id)
         project_context = ProjectContext(project, reference_files_content)
 
         outline_text = (project.outline_text or "").strip()
@@ -1409,6 +1331,73 @@ def generate_xhs_blueprint(project_id):
                 existing_payload = {}
         existing_cards = existing_payload.get("cards") if isinstance(existing_payload.get("cards"), list) else []
         existing_style_pack = existing_payload.get("style_pack") if isinstance(existing_payload.get("style_pack"), dict) else {}
+        existing_material_plan = (
+            existing_payload.get("material_plan")
+            if isinstance(existing_payload.get("material_plan"), list)
+            else []
+        )
+
+        materials = Material.query.filter_by(project_id=project_id).order_by(Material.created_at.asc()).all()
+        asset_ids = []
+        for material in materials:
+            note_data = None
+            if material.note:
+                try:
+                    note_data = json.loads(material.note)
+                except Exception:
+                    note_data = None
+            if isinstance(note_data, dict):
+                if note_data.get("type") == "xhs":
+                    continue
+                if note_data.get("type") != "asset":
+                    continue
+            asset_ids.append(material.id)
+
+        def _build_default_material_plan(total_images: int, asset_material_ids: list) -> list:
+            plan = []
+            total_assets = len(asset_material_ids)
+            for i in range(total_images):
+                if total_assets == 0:
+                    material_ids = []
+                    reason = "auto: no assets"
+                elif total_assets == 1:
+                    material_ids = [asset_material_ids[0]]
+                    reason = "auto: single asset"
+                else:
+                    if i == total_images - 1:
+                        material_ids = [asset_material_ids[-1]]
+                        reason = "auto: ending asset"
+                    else:
+                        material_ids = [asset_material_ids[i % total_assets]]
+                        reason = "auto: rotating assets"
+                plan.append({
+                    "index": i,
+                    "material_ids": material_ids,
+                    "locked": False,
+                    "reason": reason
+                })
+            return plan
+
+        if copywriting_only and existing_material_plan:
+            material_plan = existing_material_plan
+        else:
+            material_plan = _build_default_material_plan(image_count, asset_ids)
+            if existing_material_plan:
+                for position, entry in enumerate(existing_material_plan):
+                    if not isinstance(entry, dict):
+                        continue
+                    entry_index = entry.get("index", position)
+                    try:
+                        entry_index = int(entry_index)
+                    except Exception:
+                        continue
+                    if entry_index < 0 or entry_index >= image_count:
+                        continue
+                    material_ids = entry.get("material_ids")
+                    if entry.get("locked") is True and isinstance(material_ids, list) and material_ids:
+                        preserved = dict(entry)
+                        preserved["index"] = entry_index
+                        material_plan[entry_index] = preserved
 
         # Normalize cards length to pages length
         normalized_cards = []
@@ -1466,6 +1455,7 @@ def generate_xhs_blueprint(project_id):
             "copywriting": copywriting,
             "style_pack": style_pack if style_pack else existing_style_pack,
             "cards": normalized_cards if not copywriting_only else (existing_cards or normalized_cards),
+            "material_plan": material_plan,
         }
         project.product_payload = json.dumps(payload, ensure_ascii=False)
         if not copywriting_only:
@@ -1539,13 +1529,13 @@ def refine_outline(project_id):
             logger.info(f"项目 {project_id} 当前没有页面，将从空开始生成")
             current_outline = []  # 空大纲
         else:
-            current_outline = _reconstruct_outline_from_pages(pages)
+            current_outline = ProjectService.reconstruct_outline_from_pages(pages)
         
         # Get singleton AI service instance
         ai_service = get_ai_service()
         
         # Get reference files content and create project context
-        reference_files_content = _get_project_reference_files_content(project_id)
+        reference_files_content = ProjectService.get_project_reference_files_content(project_id)
         if reference_files_content:
             logger.info(f"Found {len(reference_files_content)} reference files for refine_outline")
             for rf in reference_files_content:
@@ -1696,7 +1686,7 @@ def refine_descriptions(project_id):
             logger.info(f"项目 {project_id} 当前没有描述，将基于大纲生成新描述")
         
         # Reconstruct outline from pages
-        outline = _reconstruct_outline_from_pages(pages)
+        outline = ProjectService.reconstruct_outline_from_pages(pages)
         
         # Prepare current descriptions
         current_descriptions = []
@@ -1714,7 +1704,7 @@ def refine_descriptions(project_id):
         ai_service = get_ai_service()
         
         # Get reference files content and create project context
-        reference_files_content = _get_project_reference_files_content(project_id)
+        reference_files_content = ProjectService.get_project_reference_files_content(project_id)
         if reference_files_content:
             logger.info(f"Found {len(reference_files_content)} reference files for refine_descriptions")
             for rf in reference_files_content:

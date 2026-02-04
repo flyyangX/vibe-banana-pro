@@ -30,7 +30,11 @@ export function normalizePage(data: any): Page {
   return {
     ...data,
     id: data.page_id || data.id,
+    // 保留原始字段，确保前端组件可以访问 generated_image_url
     generated_image_path: data.generated_image_url || data.generated_image_path,
+    generated_image_url: data.generated_image_url,
+    cached_image_path: data.cached_image_url || data.cached_image_path,
+    cached_image_url: data.cached_image_url,
   };
 }
 

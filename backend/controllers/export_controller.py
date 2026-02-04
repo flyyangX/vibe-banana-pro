@@ -4,9 +4,11 @@ Export Controller - handles file export endpoints
 import logging
 import os
 import io
+import zipfile
+from datetime import datetime
 
 from flask import Blueprint, request, current_app
-from models import db, Project, Page, Task
+from models import db, Project, Page, Task, XhsCardImageVersion
 from utils import (
     error_response, not_found, bad_request, success_response,
     parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages
@@ -302,4 +304,91 @@ def export_editable_pptx(project_id):
     
     except Exception as e:
         logger.exception("Error creating export task")
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@export_bp.route('/<project_id>/export/xhs', methods=['GET'])
+def export_xhs_zip(project_id):
+    """
+    GET /api/projects/{project_id}/export/xhs - Export Xiaohongshu cards as a ZIP.
+
+    This exports the *current* image version for each card index, and falls back
+    to the project's generated page images if no xhs versions exist.
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+        if project.product_type != 'xiaohongshu':
+            return bad_request("Project is not xiaohongshu type")
+
+        # Optional: export only selected indices, e.g. ?indices=0,2,6
+        indices_raw = (request.args.get('indices') or '').strip()
+        selected_indices = None
+        if indices_raw:
+            try:
+                selected_indices = sorted({int(x) for x in indices_raw.split(',') if x.strip() != ''})
+                selected_indices = [i for i in selected_indices if i >= 0]
+                if len(selected_indices) == 0:
+                    selected_indices = None
+            except Exception:
+                return bad_request("indices must be comma-separated integers, e.g. 0,2,6")
+
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        exports_dir = file_service._get_exports_dir(project_id)
+
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        filename = f"xhs_{project_id}_{timestamp}.zip"
+        output_path = os.path.join(exports_dir, filename)
+
+        versions = (
+            XhsCardImageVersion.query
+            .filter_by(project_id=project_id, is_current=True)
+            .order_by(XhsCardImageVersion.index.asc())
+            .all()
+        )
+
+        images_to_pack = []  # (zip_name, abs_path)
+        for v in versions:
+            if not v or not v.material:
+                continue
+            if selected_indices is not None and v.index not in selected_indices:
+                continue
+            abs_path = file_service.get_absolute_path(v.material.relative_path)
+            if not os.path.exists(abs_path):
+                continue
+            images_to_pack.append((f"{v.index + 1:02d}.png", abs_path))
+
+        if not images_to_pack:
+            pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index.asc()).all()
+            for i, p in enumerate(pages):
+                if not p.generated_image_path:
+                    continue
+                if selected_indices is not None and i not in selected_indices:
+                    continue
+                abs_path = file_service.get_absolute_path(p.generated_image_path)
+                if not os.path.exists(abs_path):
+                    continue
+                images_to_pack.append((f"{i + 1:02d}.png", abs_path))
+
+        if not images_to_pack:
+            return bad_request("No generated xhs images found for project")
+
+        with zipfile.ZipFile(output_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for zip_name, abs_path in images_to_pack:
+                zf.write(abs_path, arcname=zip_name)
+
+        download_path = f"/files/{project_id}/exports/{filename}"
+        base_url = request.url_root.rstrip("/")
+        download_url_absolute = f"{base_url}{download_path}"
+
+        return success_response(
+            data={
+                "download_url": download_path,
+                "download_url_absolute": download_url_absolute,
+            },
+            message="Export XHS ZIP created"
+        )
+    except Exception as e:
+        logger.exception("Error exporting XHS ZIP")
         return error_response('SERVER_ERROR', str(e), 500)

@@ -1,431 +1,230 @@
 import { apiClient } from './client';
-import type { Project, Task, ApiResponse, CreateProjectRequest, Page } from '@/types';
+import type { Task, ApiResponse, Page } from '@/types';
 import type { Settings } from '../types/index';
 
-// ===== 项目相关 API =====
+// ===== Re-exports for backwards compatibility =====
+
+// 从 project.ts 导出
+export {
+  createProject,
+  uploadTemplate,
+  deleteTemplate,
+  generateTemplateVariants,
+  listProjects,
+  getProject,
+  deleteProject,
+  updateProject,
+  updatePagesOrder,
+} from './project';
+
+// 从 generation.ts 导出
+export {
+  generateOutline,
+  generateFromDescription,
+  generateDescriptions,
+  generatePageDescription,
+  refineOutline,
+  refineDescriptions,
+  generateImages,
+  generateInfographic,
+  generateXhs,
+  generateXhsCard,
+  editXhsCardImage,
+  generateXhsBlueprint,
+  generatePageImage,
+  editPageImage,
+  getStoredOutputLanguage,
+} from './generation';
+export type { OutputLanguage } from './types';
+
+// 从 export.ts 导出
+export {
+  exportPPTX,
+  exportPDF,
+  exportEditablePPTX,
+  exportXhsZip,
+} from './export';
 
 /**
- * 创建项目
+ * 兼容旧版调用：统一导出接口
+ *
+ * - pptx/pdf: 同步返回下载链接
+ * - editable-pptx: 异步返回 task_id
  */
-export const createProject = async (data: CreateProjectRequest): Promise<ApiResponse<Project>> => {
-  // 根据输入类型确定 creation_type
-  let creation_type = 'idea';
-  if (data.description_text) {
-    creation_type = 'descriptions';
-  } else if (data.outline_text) {
-    creation_type = 'outline';
-  }
-
-  const response = await apiClient.post<ApiResponse<Project>>('/api/projects', {
-    creation_type,
-    idea_prompt: data.idea_prompt,
-    outline_text: data.outline_text,
-    description_text: data.description_text,
-    template_style: data.template_style,
-    product_type: data.product_type,
-  });
-  return response.data;
-};
-
-/**
- * 上传模板图片
- */
-export const uploadTemplate = async (
+export const exportProject = async (
   projectId: string,
-  templateImage: File,
-  templateKey?: string
-): Promise<ApiResponse<{ template_image_url: string }>> => {
-  const formData = new FormData();
-  formData.append('template_image', templateImage);
-  if (templateKey) {
-    formData.append('template_key', templateKey);
-  }
-
-  const response = await apiClient.post<ApiResponse<{ template_image_url: string }>>(
-    `/api/projects/${projectId}/template`,
-    formData
-  );
-  return response.data;
+  type: 'pptx' | 'pdf' | 'editable-pptx',
+  pageIds?: string[]
+) => {
+  const { exportPPTX, exportPDF, exportEditablePPTX } = await import('./export');
+  if (type === 'pptx') return exportPPTX(projectId, pageIds);
+  if (type === 'pdf') return exportPDF(projectId, pageIds);
+  return exportEditablePPTX(projectId, undefined, pageIds);
 };
 
-/**
- * 清除项目模板
- */
-export const deleteTemplate = async (projectId: string): Promise<ApiResponse> => {
-  const response = await apiClient.delete<ApiResponse>(`/api/projects/${projectId}/template`);
-  return response.data;
-};
+// 从 material.ts 导出
+export {
+  generateMaterialImage,
+  listMaterials,
+  uploadMaterial,
+  deleteMaterial,
+  updateMaterialMeta,
+  moveMaterial,
+  copyMaterial,
+  associateMaterialsToProject,
+  editMaterialImage,
+} from './material';
+export type { Material } from './types';
+
+// 从 template.ts 导出
+export {
+  uploadTemplateVariant,
+  selectTemplateVariant,
+  regenerateTemplateVariant,
+  uploadUserTemplate,
+  listUserTemplates,
+  deleteUserTemplate,
+} from './template';
+export type { UserTemplate } from './types';
+
+// 从 referenceFile.ts 导出
+export {
+  uploadReferenceFile,
+  getReferenceFile,
+  listProjectReferenceFiles,
+  deleteReferenceFile,
+  triggerFileParse,
+  associateFileToProject,
+  dissociateFileFromProject,
+} from './referenceFile';
+export type { ReferenceFile } from './types';
+
+// 从 types.ts 导出类型和常量
+export {
+  OUTPUT_LANGUAGE_OPTIONS,
+} from './types';
+export type {
+  OutputLanguageOption,
+  XhsCardImageVersion,
+} from './types';
+
+// ===== 页面操作 API（尚未迁移）=====
 
 /**
- * 生成模板套装
+ * 更新页面
  */
-export const generateTemplateVariants = async (
-  projectId: string,
-  types: string[],
-  options?: { extraRequirements?: string }
-): Promise<ApiResponse<{ task_id: string; status: string; total: number }>> => {
-  const response = await apiClient.post<ApiResponse<{ task_id: string; status: string; total: number }>>(
-    `/api/projects/${projectId}/templates/generate`,
-    {
-      types,
-      ...(options?.extraRequirements && options.extraRequirements.trim()
-        ? { extra_requirements: options.extraRequirements }
-        : {}),
-    }
-  );
-  return response.data;
-};
-
-/**
- * 获取项目列表（历史项目）
- */
-export const listProjects = async (limit?: number, offset?: number): Promise<ApiResponse<{ projects: Project[]; total: number }>> => {
-  const params = new URLSearchParams();
-  if (limit !== undefined) params.append('limit', limit.toString());
-  if (offset !== undefined) params.append('offset', offset.toString());
-
-  const queryString = params.toString();
-  const url = `/api/projects${queryString ? `?${queryString}` : ''}`;
-  const response = await apiClient.get<ApiResponse<{ projects: Project[]; total: number }>>(url);
-  return response.data;
-};
-
-/**
- * 获取项目详情
- */
-export const getProject = async (projectId: string): Promise<ApiResponse<Project>> => {
-  const response = await apiClient.get<ApiResponse<Project>>(`/api/projects/${projectId}`);
-  return response.data;
-};
-
-/**
- * 删除项目
- */
-export const deleteProject = async (projectId: string): Promise<ApiResponse> => {
-  const response = await apiClient.delete<ApiResponse>(`/api/projects/${projectId}`);
-  return response.data;
-};
-
-/**
- * 更新项目
- */
-export const updateProject = async (
-  projectId: string,
-  data: Partial<Project>
-): Promise<ApiResponse<Project>> => {
-  const response = await apiClient.put<ApiResponse<Project>>(`/api/projects/${projectId}`, data);
-  return response.data;
-};
-
-/**
- * 更新页面顺序
- */
-export const updatePagesOrder = async (
-  projectId: string,
-  pageIds: string[]
-): Promise<ApiResponse<Project>> => {
-  const response = await apiClient.put<ApiResponse<Project>>(
-    `/api/projects/${projectId}`,
-    { pages_order: pageIds }
-  );
-  return response.data;
-};
-
-// ===== 大纲生成 =====
-
-/**
- * 生成大纲
- * @param projectId 项目ID
- * @param language 输出语言（可选，默认从 sessionStorage 获取）
- */
-export const generateOutline = async (projectId: string, language?: OutputLanguage): Promise<ApiResponse> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/outline`,
-    { language: lang }
-  );
-  return response.data;
-};
-
-// ===== 描述生成 =====
-
-/**
- * 从描述文本生成大纲和页面描述（一次性完成）
- * @param projectId 项目ID
- * @param descriptionText 描述文本（可选）
- * @param language 输出语言（可选，默认从 sessionStorage 获取）
- */
-export const generateFromDescription = async (projectId: string, descriptionText?: string, language?: OutputLanguage): Promise<ApiResponse> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/from-description`,
-    { 
-      ...(descriptionText ? { description_text: descriptionText } : {}),
-      language: lang 
-    }
-  );
-  return response.data;
-};
-
-/**
- * 批量生成描述
- * @param projectId 项目ID
- * @param language 输出语言（可选，默认从 sessionStorage 获取）
- */
-export const generateDescriptions = async (projectId: string, language?: OutputLanguage): Promise<ApiResponse> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/descriptions`,
-    { language: lang }
-  );
-  return response.data;
-};
-
-/**
- * 生成单页描述
- */
-export const generatePageDescription = async (
+export const updatePage = async (
   projectId: string,
   pageId: string,
-  forceRegenerate: boolean = false,
-  language?: OutputLanguage,
-  extraRequirements?: string
-): Promise<ApiResponse> => {
+  data: Partial<Page>
+): Promise<ApiResponse<Page>> => {
+  const response = await apiClient.put<ApiResponse<Page>>(
+    `/api/projects/${projectId}/pages/${pageId}`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * 更新页面描述
+ */
+export const updatePageDescription = async (
+  projectId: string,
+  pageId: string,
+  descriptionContent: any,
+  language?: import('./generation').OutputLanguage
+): Promise<ApiResponse<Page>> => {
+  const { getStoredOutputLanguage } = await import('./generation');
   const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/pages/${pageId}/generate/description`,
-    {
-      force_regenerate: forceRegenerate,
-      language: lang,
-      ...(extraRequirements && extraRequirements.trim()
-        ? { extra_requirements: extraRequirements }
-        : {}),
-    }
+  const response = await apiClient.put<ApiResponse<Page>>(
+    `/api/projects/${projectId}/pages/${pageId}/description`,
+    { description_content: descriptionContent, language: lang }
   );
   return response.data;
 };
 
 /**
- * 根据用户要求修改大纲
- * @param projectId 项目ID
- * @param userRequirement 用户要求
- * @param previousRequirements 历史要求（可选）
- * @param language 输出语言（可选，默认从 sessionStorage 获取）
+ * 更新页面类型
  */
-export const refineOutline = async (
+export const updatePageType = async (
   projectId: string,
-  userRequirement: string,
-  previousRequirements?: string[],
-  language?: OutputLanguage
-): Promise<ApiResponse<{ pages: Page[]; message: string }>> => {
+  pageId: string,
+  pageType: string
+): Promise<ApiResponse<Page>> => {
+  const response = await apiClient.put<ApiResponse<Page>>(
+    `/api/projects/${projectId}/pages/${pageId}/type`,
+    { page_type: pageType }
+  );
+  return response.data;
+};
+
+/**
+ * 更新页面大纲
+ */
+export const updatePageOutline = async (
+  projectId: string,
+  pageId: string,
+  outlineContent: any,
+  language?: import('./generation').OutputLanguage
+): Promise<ApiResponse<Page>> => {
+  const { getStoredOutputLanguage } = await import('./generation');
   const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse<{ pages: Page[]; message: string }>>(
-    `/api/projects/${projectId}/refine/outline`,
-    {
-      user_requirement: userRequirement,
-      previous_requirements: previousRequirements || [],
-      language: lang
-    }
+  const response = await apiClient.put<ApiResponse<Page>>(
+    `/api/projects/${projectId}/pages/${pageId}/outline`,
+    { outline_content: outlineContent, language: lang }
   );
   return response.data;
 };
 
 /**
- * 根据用户要求修改页面描述
- * @param projectId 项目ID
- * @param userRequirement 用户要求
- * @param previousRequirements 历史要求（可选）
- * @param language 输出语言（可选，默认从 sessionStorage 获取）
+ * 删除页面
  */
-export const refineDescriptions = async (
-  projectId: string,
-  userRequirement: string,
-  previousRequirements?: string[],
-  language?: OutputLanguage
-): Promise<ApiResponse<{ pages: Page[]; message: string }>> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse<{ pages: Page[]; message: string }>>(
-    `/api/projects/${projectId}/refine/descriptions`,
-    {
-      user_requirement: userRequirement,
-      previous_requirements: previousRequirements || [],
-      language: lang
-    }
-  );
-  return response.data;
-};
-
-// ===== 图片生成 =====
-
-/**
- * 批量生成图片
- * @param projectId 项目ID
- * @param language 输出语言（可选，默认从 sessionStorage 获取）
- * @param pageIds 可选的页面ID列表，如果不提供则生成所有页面
- */
-export const generateImages = async (projectId: string, language?: OutputLanguage, pageIds?: string[]): Promise<ApiResponse> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/images`,
-    { language: lang, page_ids: pageIds }
+export const deletePage = async (projectId: string, pageId: string): Promise<ApiResponse> => {
+  const response = await apiClient.delete<ApiResponse>(
+    `/api/projects/${projectId}/pages/${pageId}`
   );
   return response.data;
 };
 
 /**
- * 生成信息图
+ * 添加页面
  */
-export const generateInfographic = async (
-  projectId: string,
-  options?: {
-    mode?: 'single' | 'series';
-    pageIds?: string[];
-    language?: OutputLanguage;
-    aspectRatio?: string;
-    resolution?: string;
-    maxWorkers?: number;
-    useTemplate?: boolean;
-  }
-): Promise<ApiResponse> => {
-  const lang = options?.language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/infographic`,
-    {
-      mode: options?.mode || 'single',
-      language: lang,
-      ...(options?.pageIds && options.pageIds.length > 0 ? { page_ids: options.pageIds } : {}),
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
-      ...(options?.resolution ? { resolution: options.resolution } : {}),
-      ...(options?.maxWorkers ? { max_workers: options.maxWorkers } : {}),
-      ...(options?.useTemplate !== undefined ? { use_template: options.useTemplate } : {}),
-    }
+export const addPage = async (projectId: string, data: Partial<Page>): Promise<ApiResponse<Page>> => {
+  const response = await apiClient.post<ApiResponse<Page>>(
+    `/api/projects/${projectId}/pages`,
+    data
   );
   return response.data;
 };
+
+// ===== 任务查询 API =====
 
 /**
- * 生成小红书图文（竖版轮播）
+ * 查询任务状态
  */
-export const generateXhs = async (
-  projectId: string,
-  options?: {
-    imageCount?: number; // 6-9
-    aspectRatio?: '4:5' | '3:4' | '9:16';
-    resolution?: string;
-    maxWorkers?: number;
-    useTemplate?: boolean;
-    templateUsageMode?: 'auto' | 'template' | 'style';
-    language?: OutputLanguage;
-  }
-): Promise<ApiResponse> => {
-  const lang = options?.language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/xhs`,
-    {
-      language: lang,
-      ...(typeof options?.imageCount === 'number' ? { image_count: options.imageCount } : {}),
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
-      ...(options?.resolution ? { resolution: options.resolution } : {}),
-      ...(options?.maxWorkers ? { max_workers: options.maxWorkers } : {}),
-      ...(typeof options?.useTemplate === 'boolean' ? { use_template: options.useTemplate } : {}),
-      ...(options?.templateUsageMode ? { template_usage_mode: options.templateUsageMode } : {}),
-    }
-  );
+export const getTaskStatus = async (projectId: string, taskId: string): Promise<ApiResponse<Task>> => {
+  const response = await apiClient.get<ApiResponse<Task>>(`/api/projects/${projectId}/tasks/${taskId}`);
   return response.data;
 };
+
+// ===== 小红书卡片版本 API =====
 
 /**
- * 生成单张小红书图文卡片
+ * 获取小红书卡片图片版本列表
  */
-export const generateXhsCard = async (
-  projectId: string,
-  options: {
-    index: number;
-    aspectRatio?: '4:5' | '3:4' | '9:16';
-    resolution?: string;
-    useTemplate?: boolean;
-    templateUsageMode?: 'auto' | 'template' | 'style';
-    language?: OutputLanguage;
-  }
-): Promise<ApiResponse> => {
-  const lang = options?.language || await getStoredOutputLanguage();
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/xhs/card`,
-    {
-      index: options.index,
-      language: lang,
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
-      ...(options?.resolution ? { resolution: options.resolution } : {}),
-      ...(typeof options?.useTemplate === 'boolean' ? { use_template: options.useTemplate } : {}),
-      ...(options?.templateUsageMode ? { template_usage_mode: options.templateUsageMode } : {}),
-    }
-  );
-  return response.data;
-};
-
-/**
- * 编辑单张小红书图文卡片（基于已生成图片）
- */
-export const editXhsCardImage = async (
-  projectId: string,
-  options: {
-    index: number;
-    editInstruction: string;
-    aspectRatio?: '4:5' | '3:4' | '9:16';
-    resolution?: string;
-    templateUsageMode?: 'auto' | 'template' | 'style';
-    descImageUrls?: string[];
-    uploadedFiles?: File[];
-  }
-): Promise<ApiResponse> => {
-  const formData = new FormData();
-  formData.append('index', String(options.index));
-  formData.append('edit_instruction', options.editInstruction);
-  if (options.aspectRatio) {
-    formData.append('aspect_ratio', options.aspectRatio);
-  }
-  if (options.resolution) {
-    formData.append('resolution', options.resolution);
-  }
-  if (options.templateUsageMode) {
-    formData.append('template_usage_mode', options.templateUsageMode);
-  }
-  if (options.descImageUrls && options.descImageUrls.length > 0) {
-    formData.append('desc_image_urls', JSON.stringify(options.descImageUrls));
-  }
-  if (options.uploadedFiles && options.uploadedFiles.length > 0) {
-    options.uploadedFiles.forEach((file) => formData.append('context_images', file));
-  }
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/xhs/card/edit`,
-    formData
-  );
-  return response.data;
-};
-
-export interface XhsCardImageVersion {
-  version_id: string;
-  project_id: string;
-  index: number;
-  material_id: string;
-  version_number: number;
-  is_current: boolean;
-  created_at?: string;
-  material_url?: string;
-  display_name?: string;
-  material_created_at?: string;
-}
-
 export const getXhsCardImageVersions = async (
   projectId: string,
   index: number
-): Promise<ApiResponse<{ versions: XhsCardImageVersion[] }>> => {
-  const response = await apiClient.get<ApiResponse<{ versions: XhsCardImageVersion[] }>>(
+): Promise<ApiResponse<{ versions: import('./types').XhsCardImageVersion[] }>> => {
+  const response = await apiClient.get<ApiResponse<{ versions: import('./types').XhsCardImageVersion[] }>>(
     `/api/projects/${projectId}/xhs/cards/${index}/image-versions`
   );
   return response.data;
 };
 
+/**
+ * 设置小红书卡片当前图片版本
+ */
 export const setXhsCardCurrentImageVersion = async (
   projectId: string,
   index: number,
@@ -438,213 +237,21 @@ export const setXhsCardCurrentImageVersion = async (
 };
 
 /**
- * 生成小红书图文蓝图（仅文案+卡片内容，不出图）
+ * 更新小红书卡片素材（material_plan）
  */
-export const generateXhsBlueprint = async (
+export const updateXhsCardMaterials = async (
   projectId: string,
-  options?: {
-    aspectRatio?: '4:5' | '3:4' | '9:16';
-    language?: OutputLanguage;
-    copywritingOnly?: boolean;
-  }
+  index: number,
+  payload: { material_ids: string[]; locked?: boolean }
 ): Promise<ApiResponse> => {
-  const lang = options?.language || await getStoredOutputLanguage();
   const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/generate/xhs/blueprint`,
-    {
-      language: lang,
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
-      ...(options?.copywritingOnly ? { copywriting_only: true } : {}),
-    }
+    `/api/projects/${projectId}/xhs/cards/${index}/materials`,
+    payload
   );
   return response.data;
 };
 
-/**
- * 生成单页图片
- */
-export const generatePageImage = async (
-  projectId: string,
-  pageId: string,
-  forceRegenerate: boolean = false,
-  language?: OutputLanguage,
-  options?: {
-    useTemplate?: boolean;
-    extraRequirements?: string;
-    refImageUrls?: string[]; // /files/... 或 http(s)...
-    uploadedFiles?: File[];
-  }
-): Promise<ApiResponse> => {
-  const lang = language || await getStoredOutputLanguage();
-  const useTemplate = options?.useTemplate;
-  const extraRequirements = options?.extraRequirements;
-  const refImageUrls = options?.refImageUrls;
-
-  // 如果有上传文件，用 multipart/form-data
-  if (options?.uploadedFiles && options.uploadedFiles.length > 0) {
-    const formData = new FormData();
-    formData.append('force_regenerate', String(forceRegenerate));
-    formData.append('language', lang);
-    if (useTemplate !== undefined) {
-      formData.append('use_template', String(useTemplate));
-    }
-    if (extraRequirements && extraRequirements.trim()) {
-      formData.append('extra_requirements', extraRequirements);
-    }
-    if (refImageUrls && refImageUrls.length > 0) {
-      formData.append('ref_image_urls', JSON.stringify(refImageUrls));
-    }
-    options.uploadedFiles.forEach((file) => {
-      formData.append('context_images', file);
-    });
-
-    const response = await apiClient.post<ApiResponse>(
-      `/api/projects/${projectId}/pages/${pageId}/generate/image`,
-      formData
-    );
-    return response.data;
-  }
-
-  // 否则用 JSON
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/pages/${pageId}/generate/image`,
-    {
-      force_regenerate: forceRegenerate,
-      language: lang,
-      ...(useTemplate !== undefined ? { use_template: useTemplate } : {}),
-      ...(extraRequirements && extraRequirements.trim()
-        ? { extra_requirements: extraRequirements }
-        : {}),
-      ...(refImageUrls && refImageUrls.length > 0 ? { ref_image_urls: refImageUrls } : {}),
-    }
-  );
-  return response.data;
-};
-
-/**
- * 编辑图片（自然语言修改）
- */
-export const editPageImage = async (
-  projectId: string,
-  pageId: string,
-  editPrompt: string,
-  contextImages?: {
-    useTemplate?: boolean;
-    descImageUrls?: string[];
-    uploadedFiles?: File[];
-  }
-): Promise<ApiResponse> => {
-  // 如果有上传的文件，使用 multipart/form-data
-  if (contextImages?.uploadedFiles && contextImages.uploadedFiles.length > 0) {
-    const formData = new FormData();
-    formData.append('edit_instruction', editPrompt);
-    formData.append('use_template', String(contextImages.useTemplate || false));
-    if (contextImages.descImageUrls && contextImages.descImageUrls.length > 0) {
-      formData.append('desc_image_urls', JSON.stringify(contextImages.descImageUrls));
-    }
-    // 添加上传的文件
-    contextImages.uploadedFiles.forEach((file) => {
-      formData.append('context_images', file);
-    });
-
-    const response = await apiClient.post<ApiResponse>(
-      `/api/projects/${projectId}/pages/${pageId}/edit/image`,
-      formData
-    );
-    return response.data;
-  } else {
-    // 使用 JSON
-    const response = await apiClient.post<ApiResponse>(
-      `/api/projects/${projectId}/pages/${pageId}/edit/image`,
-      {
-        edit_instruction: editPrompt,
-        context_images: {
-          use_template: contextImages?.useTemplate || false,
-          desc_image_urls: contextImages?.descImageUrls || [],
-        },
-      }
-    );
-    return response.data;
-  }
-};
-
-/**
- * 上传并替换模板套装变体图
- */
-export const uploadTemplateVariant = async (
-  projectId: string,
-  variantType: 'cover' | 'content' | 'transition' | 'ending',
-  file: File
-): Promise<ApiResponse> => {
-  const formData = new FormData();
-  formData.append('variant_image', file);
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/templates/variant/${variantType}/upload`,
-    formData
-  );
-  return response.data;
-};
-
-/**
- * 从历史版本中选择模板套装单图
- */
-export const selectTemplateVariant = async (
-  projectId: string,
-  variantType: 'cover' | 'content' | 'transition' | 'ending',
-  variantUrl: string
-): Promise<ApiResponse> => {
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/templates/variant/${variantType}/select`,
-    { variant_url: variantUrl }
-  );
-  return response.data;
-};
-
-/**
- * 重新生成模板套装单图（支持额外提示词/参考图）
- */
-export const regenerateTemplateVariant = async (
-  projectId: string,
-  variantType: 'cover' | 'content' | 'transition' | 'ending',
-  options?: {
-    extraRequirements?: string;
-    refImageUrls?: string[];
-    uploadedFiles?: File[];
-  }
-): Promise<ApiResponse> => {
-  const extraRequirements = options?.extraRequirements;
-  const refImageUrls = options?.refImageUrls;
-
-  if (options?.uploadedFiles && options.uploadedFiles.length > 0) {
-    const formData = new FormData();
-    if (extraRequirements && extraRequirements.trim()) {
-      formData.append('extra_requirements', extraRequirements);
-    }
-    if (refImageUrls && refImageUrls.length > 0) {
-      formData.append('ref_image_urls', JSON.stringify(refImageUrls));
-    }
-    options.uploadedFiles.forEach((file) => {
-      formData.append('context_images', file);
-    });
-
-    const response = await apiClient.post<ApiResponse>(
-      `/api/projects/${projectId}/templates/variant/${variantType}/regenerate`,
-      formData
-    );
-    return response.data;
-  }
-
-  const response = await apiClient.post<ApiResponse>(
-    `/api/projects/${projectId}/templates/variant/${variantType}/regenerate`,
-    {
-      ...(extraRequirements && extraRequirements.trim()
-        ? { extra_requirements: extraRequirements }
-        : {}),
-      ...(refImageUrls && refImageUrls.length > 0 ? { ref_image_urls: refImageUrls } : {}),
-    }
-  );
-  return response.data;
-};
+// ===== 页面图片版本 API =====
 
 /**
  * 获取页面图片历史版本
@@ -686,521 +293,7 @@ export const clearPageImage = async (
   return response.data;
 };
 
-// ===== 页面操作 =====
-
-/**
- * 更新页面
- */
-export const updatePage = async (
-  projectId: string,
-  pageId: string,
-  data: Partial<Page>
-): Promise<ApiResponse<Page>> => {
-  const response = await apiClient.put<ApiResponse<Page>>(
-    `/api/projects/${projectId}/pages/${pageId}`,
-    data
-  );
-  return response.data;
-};
-
-/**
- * 更新页面描述
- */
-export const updatePageDescription = async (
-  projectId: string,
-  pageId: string,
-  descriptionContent: any,
-  language?: OutputLanguage
-): Promise<ApiResponse<Page>> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.put<ApiResponse<Page>>(
-    `/api/projects/${projectId}/pages/${pageId}/description`,
-    { description_content: descriptionContent, language: lang }
-  );
-  return response.data;
-};
-
-/**
- * 更新页面类型
- */
-export const updatePageType = async (
-  projectId: string,
-  pageId: string,
-  pageType: string
-): Promise<ApiResponse<Page>> => {
-  const response = await apiClient.put<ApiResponse<Page>>(
-    `/api/projects/${projectId}/pages/${pageId}/type`,
-    { page_type: pageType }
-  );
-  return response.data;
-};
-
-/**
- * 更新页面大纲
- */
-export const updatePageOutline = async (
-  projectId: string,
-  pageId: string,
-  outlineContent: any,
-  language?: OutputLanguage
-): Promise<ApiResponse<Page>> => {
-  const lang = language || await getStoredOutputLanguage();
-  const response = await apiClient.put<ApiResponse<Page>>(
-    `/api/projects/${projectId}/pages/${pageId}/outline`,
-    { outline_content: outlineContent, language: lang }
-  );
-  return response.data;
-};
-
-/**
- * 删除页面
- */
-export const deletePage = async (projectId: string, pageId: string): Promise<ApiResponse> => {
-  const response = await apiClient.delete<ApiResponse>(
-    `/api/projects/${projectId}/pages/${pageId}`
-  );
-  return response.data;
-};
-
-/**
- * 添加页面
- */
-export const addPage = async (projectId: string, data: Partial<Page>): Promise<ApiResponse<Page>> => {
-  const response = await apiClient.post<ApiResponse<Page>>(
-    `/api/projects/${projectId}/pages`,
-    data
-  );
-  return response.data;
-};
-
-// ===== 任务查询 =====
-
-/**
- * 查询任务状态
- */
-export const getTaskStatus = async (projectId: string, taskId: string): Promise<ApiResponse<Task>> => {
-  const response = await apiClient.get<ApiResponse<Task>>(`/api/projects/${projectId}/tasks/${taskId}`);
-  return response.data;
-};
-
-// ===== 导出 =====
-
-/**
- * Helper function to build query string with page_ids
- */
-const buildPageIdsQuery = (pageIds?: string[]): string => {
-  if (!pageIds || pageIds.length === 0) return '';
-  const params = new URLSearchParams();
-  params.set('page_ids', pageIds.join(','));
-  return `?${params.toString()}`;
-};
-
-/**
- * 导出为PPTX
- * @param projectId 项目ID
- * @param pageIds 可选的页面ID列表，如果不提供则导出所有页面
- */
-export const exportPPTX = async (
-  projectId: string,
-  pageIds?: string[]
-): Promise<ApiResponse<{ download_url: string; download_url_absolute?: string }>> => {
-  const url = `/api/projects/${projectId}/export/pptx${buildPageIdsQuery(pageIds)}`;
-  const response = await apiClient.get<
-    ApiResponse<{ download_url: string; download_url_absolute?: string }>
-  >(url);
-  return response.data;
-};
-
-/**
- * 导出为PDF
- * @param projectId 项目ID
- * @param pageIds 可选的页面ID列表，如果不提供则导出所有页面
- */
-export const exportPDF = async (
-  projectId: string,
-  pageIds?: string[]
-): Promise<ApiResponse<{ download_url: string; download_url_absolute?: string }>> => {
-  const url = `/api/projects/${projectId}/export/pdf${buildPageIdsQuery(pageIds)}`;
-  const response = await apiClient.get<
-    ApiResponse<{ download_url: string; download_url_absolute?: string }>
-  >(url);
-  return response.data;
-};
-
-/**
- * 导出为可编辑PPTX（异步任务）
- * @param projectId 项目ID
- * @param filename 可选的文件名
- * @param pageIds 可选的页面ID列表，如果不提供则导出所有页面
- */
-export const exportEditablePPTX = async (
-  projectId: string,
-  filename?: string,
-  pageIds?: string[]
-): Promise<ApiResponse<{ task_id: string }>> => {
-  const response = await apiClient.post<
-    ApiResponse<{ task_id: string }>
-  >(`/api/projects/${projectId}/export/editable-pptx`, {
-    filename,
-    page_ids: pageIds
-  });
-  return response.data;
-};
-
-// ===== 素材生成 =====
-
-/**
- * 生成单张素材图片（不绑定具体页面）
- * 现在返回异步任务ID，需要通过getTaskStatus轮询获取结果
- */
-export const generateMaterialImage = async (
-  projectId: string,
-  prompt: string,
-  refImage?: File | null,
-  extraImages?: File[]
-): Promise<ApiResponse<{ task_id: string; status: string }>> => {
-  const formData = new FormData();
-  formData.append('prompt', prompt);
-  if (refImage) {
-    formData.append('ref_image', refImage);
-  }
-
-  if (extraImages && extraImages.length > 0) {
-    extraImages.forEach((file) => {
-      formData.append('extra_images', file);
-    });
-  }
-
-  const response = await apiClient.post<ApiResponse<{ task_id: string; status: string }>>(
-    `/api/projects/${projectId}/materials/generate`,
-    formData
-  );
-  return response.data;
-};
-
-/**
- * 素材信息接口
- */
-export interface Material {
-  id: string;
-  project_id?: string | null;
-  filename: string;
-  display_name?: string | null;
-  note?: string | null;
-  url: string;
-  relative_path: string;
-  created_at: string;
-  // 可选的附加信息：用于展示友好名称
-  prompt?: string;
-  original_filename?: string;
-  source_filename?: string;
-  name?: string;
-}
-
-/**
- * 获取素材列表
- * @param projectId 项目ID，可选
- *   - If provided and not 'all' or 'none': Get materials for specific project via /api/projects/{projectId}/materials
- *   - If 'all': Get all materials via /api/materials?project_id=all
- *   - If 'none': Get global materials (not bound to any project) via /api/materials?project_id=none
- *   - If not provided: Get all materials via /api/materials
- */
-export const listMaterials = async (
-  projectId?: string
-): Promise<ApiResponse<{ materials: Material[]; count: number }>> => {
-  let url: string;
-
-  if (!projectId || projectId === 'all') {
-    // Get all materials using global endpoint
-    url = '/api/materials?project_id=all';
-  } else if (projectId === 'none') {
-    // Get global materials (not bound to any project)
-    url = '/api/materials?project_id=none';
-  } else {
-    // Get materials for specific project
-    url = `/api/projects/${projectId}/materials`;
-  }
-
-  const response = await apiClient.get<ApiResponse<{ materials: Material[]; count: number }>>(url);
-  return response.data;
-};
-
-/**
- * 上传素材图片
- * @param file 图片文件
- * @param projectId 可选的项目ID
- *   - If provided: Upload material bound to the project
- *   - If not provided or 'none': Upload as global material (not bound to any project)
- */
-export const uploadMaterial = async (
-  file: File,
-  projectId?: string | null
-): Promise<ApiResponse<Material>> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  let url: string;
-  if (!projectId || projectId === 'none') {
-    // Use global upload endpoint for materials not bound to any project
-    url = '/api/materials/upload';
-  } else {
-    // Use project-specific upload endpoint
-    url = `/api/projects/${projectId}/materials/upload`;
-  }
-
-  const response = await apiClient.post<ApiResponse<Material>>(url, formData);
-  return response.data;
-};
-
-/**
- * 删除素材
- */
-export const deleteMaterial = async (materialId: string): Promise<ApiResponse<{ id: string }>> => {
-  const response = await apiClient.delete<ApiResponse<{ id: string }>>(`/api/materials/${materialId}`);
-  return response.data;
-};
-
-/**
- * 更新素材元数据
- */
-export const updateMaterialMeta = async (
-  materialId: string,
-  payload: { display_name?: string | null; note?: string | null }
-): Promise<ApiResponse<{ material: Material }>> => {
-  const response = await apiClient.patch<ApiResponse<{ material: Material }>>(
-    `/api/materials/${materialId}`,
-    payload
-  );
-  return response.data;
-};
-
-/**
- * 移动素材到目标项目（或全局）
- */
-export const moveMaterial = async (
-  materialId: string,
-  targetProjectId?: string | null
-): Promise<ApiResponse<{ material: Material }>> => {
-  const response = await apiClient.post<ApiResponse<{ material: Material }>>(
-    `/api/materials/${materialId}/move`,
-    { target_project_id: targetProjectId ?? 'none' }
-  );
-  return response.data;
-};
-
-/**
- * 复制素材到目标项目（或全局）
- */
-export const copyMaterial = async (
-  materialId: string,
-  targetProjectId?: string | null
-): Promise<ApiResponse<{ material: Material }>> => {
-  const response = await apiClient.post<ApiResponse<{ material: Material }>>(
-    `/api/materials/${materialId}/copy`,
-    { target_project_id: targetProjectId ?? 'none' }
-  );
-  return response.data;
-};
-
-/**
- * 关联素材到项目（通过URL）
- * @param projectId 项目ID
- * @param materialUrls 素材URL列表
- */
-export const associateMaterialsToProject = async (
-  projectId: string,
-  materialUrls: string[]
-): Promise<ApiResponse<{ updated_ids: string[]; count: number }>> => {
-  const response = await apiClient.post<ApiResponse<{ updated_ids: string[]; count: number }>>(
-    '/api/materials/associate',
-    { project_id: projectId, material_urls: materialUrls }
-  );
-  return response.data;
-};
-
-// ===== 用户模板 =====
-
-export interface UserTemplate {
-  template_id: string;
-  name?: string;
-  template_image_url: string;
-  thumb_url?: string;  // Thumbnail URL for faster loading
-  product_tags?: string[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-/**
- * 上传用户模板
- */
-export const uploadUserTemplate = async (
-  templateImage: File,
-  name?: string,
-  productTags?: string[]
-): Promise<ApiResponse<UserTemplate>> => {
-  const formData = new FormData();
-  formData.append('template_image', templateImage);
-  if (name) {
-    formData.append('name', name);
-  }
-  if (productTags && productTags.length > 0) {
-    formData.append('product_tags', JSON.stringify(productTags));
-  }
-
-  const response = await apiClient.post<ApiResponse<UserTemplate>>(
-    '/api/user-templates',
-    formData
-  );
-  return response.data;
-};
-
-/**
- * 获取用户模板列表
- */
-export const listUserTemplates = async (productTag?: string): Promise<ApiResponse<{ templates: UserTemplate[] }>> => {
-  const response = await apiClient.get<ApiResponse<{ templates: UserTemplate[] }>>(
-    '/api/user-templates',
-    productTag ? { params: { product_tag: productTag } } : undefined
-  );
-  return response.data;
-};
-
-/**
- * 删除用户模板
- */
-export const deleteUserTemplate = async (templateId: string): Promise<ApiResponse> => {
-  const response = await apiClient.delete<ApiResponse>(`/api/user-templates/${templateId}`);
-  return response.data;
-};
-
-// ===== 参考文件相关 API =====
-
-export interface ReferenceFile {
-  id: string;
-  project_id: string | null;
-  filename: string;
-  file_size: number;
-  file_type: string;
-  parse_status: 'pending' | 'parsing' | 'completed' | 'failed';
-  markdown_content: string | null;
-  error_message: string | null;
-  image_caption_failed_count?: number;  // Optional, calculated dynamically
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * 上传参考文件
- * @param file 文件
- * @param projectId 可选的项目ID（如果不提供或为'none'，则为全局文件）
- */
-export const uploadReferenceFile = async (
-  file: File,
-  projectId?: string | null
-): Promise<ApiResponse<{ file: ReferenceFile }>> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  if (projectId && projectId !== 'none') {
-    formData.append('project_id', projectId);
-  }
-
-  const response = await apiClient.post<ApiResponse<{ file: ReferenceFile }>>(
-    '/api/reference-files/upload',
-    formData
-  );
-  return response.data;
-};
-
-/**
- * 获取参考文件信息
- * @param fileId 文件ID
- */
-export const getReferenceFile = async (fileId: string): Promise<ApiResponse<{ file: ReferenceFile }>> => {
-  const response = await apiClient.get<ApiResponse<{ file: ReferenceFile }>>(
-    `/api/reference-files/${fileId}`
-  );
-  return response.data;
-};
-
-/**
- * 列出项目的参考文件
- * @param projectId 项目ID（'global' 或 'none' 表示列出全局文件）
- */
-export const listProjectReferenceFiles = async (
-  projectId: string
-): Promise<ApiResponse<{ files: ReferenceFile[] }>> => {
-  const response = await apiClient.get<ApiResponse<{ files: ReferenceFile[] }>>(
-    `/api/reference-files/project/${projectId}`
-  );
-  return response.data;
-};
-
-/**
- * 删除参考文件
- * @param fileId 文件ID
- */
-export const deleteReferenceFile = async (fileId: string): Promise<ApiResponse<{ message: string }>> => {
-  const response = await apiClient.delete<ApiResponse<{ message: string }>>(
-    `/api/reference-files/${fileId}`
-  );
-  return response.data;
-};
-
-/**
- * 触发文件解析
- * @param fileId 文件ID
- */
-export const triggerFileParse = async (fileId: string): Promise<ApiResponse<{ file: ReferenceFile; message: string }>> => {
-  const response = await apiClient.post<ApiResponse<{ file: ReferenceFile; message: string }>>(
-    `/api/reference-files/${fileId}/parse`
-  );
-  return response.data;
-};
-
-/**
- * 将参考文件关联到项目
- * @param fileId 文件ID
- * @param projectId 项目ID
- */
-export const associateFileToProject = async (
-  fileId: string,
-  projectId: string
-): Promise<ApiResponse<{ file: ReferenceFile }>> => {
-  const response = await apiClient.post<ApiResponse<{ file: ReferenceFile }>>(
-    `/api/reference-files/${fileId}/associate`,
-    { project_id: projectId }
-  );
-  return response.data;
-};
-
-/**
- * 从项目中移除参考文件（不删除文件本身）
- * @param fileId 文件ID
- */
-export const dissociateFileFromProject = async (
-  fileId: string
-): Promise<ApiResponse<{ file: ReferenceFile; message: string }>> => {
-  const response = await apiClient.post<ApiResponse<{ file: ReferenceFile; message: string }>>(
-    `/api/reference-files/${fileId}/dissociate`
-  );
-  return response.data;
-};
-
-// ===== 输出语言设置 =====
-
-export type OutputLanguage = 'zh' | 'ja' | 'en' | 'auto';
-
-export interface OutputLanguageOption {
-  value: OutputLanguage;
-  label: string;
-}
-
-export const OUTPUT_LANGUAGE_OPTIONS: OutputLanguageOption[] = [
-  { value: 'zh', label: '中文' },
-  { value: 'ja', label: '日本語' },
-  { value: 'en', label: 'English' },
-  { value: 'auto', label: '自动' },
-];
+// ===== 输出语言设置 API =====
 
 /**
  * 获取默认输出语言设置（从服务器环境变量读取）
@@ -1209,26 +302,14 @@ export const OUTPUT_LANGUAGE_OPTIONS: OutputLanguageOption[] = [
  * 实际的语言选择应由前端在 sessionStorage 中管理，
  * 并在每次生成请求时通过 language 参数传递。
  */
-export const getDefaultOutputLanguage = async (): Promise<ApiResponse<{ language: OutputLanguage }>> => {
-  const response = await apiClient.get<ApiResponse<{ language: OutputLanguage }>>(
+export const getDefaultOutputLanguage = async (): Promise<ApiResponse<{ language: import('./generation').OutputLanguage }>> => {
+  const response = await apiClient.get<ApiResponse<{ language: import('./generation').OutputLanguage }>>(
     '/api/output-language'
   );
   return response.data;
 };
 
-/**
- * 从后端 Settings 获取用户的输出语言偏好
- * 如果获取失败，返回默认值 'zh'
- */
-export const getStoredOutputLanguage = async (): Promise<OutputLanguage> => {
-  try {
-    const response = await apiClient.get<ApiResponse<{ language: OutputLanguage }>>('/api/output-language');
-    return response.data.data?.language || 'zh';
-  } catch (error) {
-    console.warn('Failed to load output language from settings, using default', error);
-    return 'zh';
-  }
-};
+// ===== 系统设置 API =====
 
 /**
  * 获取系统设置
@@ -1242,7 +323,7 @@ export const getSettings = async (): Promise<ApiResponse<Settings>> => {
  * 更新系统设置
  */
 export const updateSettings = async (
-  data: Partial<Omit<Settings, 'id' | 'api_key_length' | 'mineru_token_length' | 'baidu_ocr_api_key_length' | 'created_at' | 'updated_at'>> & { 
+  data: Partial<Omit<Settings, 'id' | 'api_key_length' | 'mineru_token_length' | 'baidu_ocr_api_key_length' | 'created_at' | 'updated_at'>> & {
     api_key?: string;
     mineru_token?: string;
     baidu_ocr_api_key?: string;
@@ -1259,6 +340,8 @@ export const resetSettings = async (): Promise<ApiResponse<Settings>> => {
   const response = await apiClient.post<ApiResponse<Settings>>('/api/settings/reset');
   return response.data;
 };
+
+// ===== 设置测试 API =====
 
 /**
  * 测试百度 OCR 服务

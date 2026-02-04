@@ -54,6 +54,7 @@ RUN if [ -f uv.lock ]; then \
 
 # 复制后端代码
 COPY backend/ ./backend/
+COPY backend/config.py ./backend/config.py
 
 # 创建必要的目录
 RUN mkdir -p /app/backend/instance /app/uploads

@@ -6,19 +6,20 @@ from models import db, Project, Material, Task
 from utils import success_response, error_response, not_found, bad_request
 from services import FileService
 from services.ai_service_manager import get_ai_service
-from services.task_manager import task_manager, generate_material_image_task
+from services.task_manager import task_manager, generate_material_image_task, edit_material_image_task
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from typing import Optional
 import tempfile
 import shutil
 import time
+import json
 
 
 material_bp = Blueprint('materials', __name__, url_prefix='/api/projects')
 material_global_bp = Blueprint('materials_global', __name__, url_prefix='/api/materials')
 
-ALLOWED_MATERIAL_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'}
+ALLOWED_MATERIAL_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.heic'}
 
 
 def _build_material_query(filter_project_id: str):
@@ -64,7 +65,9 @@ def _handle_material_upload(default_project_id: Optional[str] = None):
             return error
 
         file = request.files.get('file')
-        material, error = _save_material_file(file, target_project_id)
+        display_name = request.form.get('display_name')
+        note = request.form.get('note')
+        material, error = _save_material_file(file, target_project_id, display_name, note)
         if error:
             return error
 
@@ -94,7 +97,12 @@ def _resolve_target_project_id(raw_project_id: Optional[str], allow_none: bool =
     return raw_project_id, None
 
 
-def _save_material_file(file, target_project_id: Optional[str]):
+def _save_material_file(
+    file,
+    target_project_id: Optional[str],
+    display_name: Optional[str] = None,
+    note: Optional[str] = None
+):
     """Shared logic for saving uploaded material files to disk and DB."""
     if not file or not file.filename:
         return None, bad_request("file is required")
@@ -127,6 +135,8 @@ def _save_material_file(file, target_project_id: Optional[str]):
     material = Material(
         project_id=target_project_id,
         filename=unique_filename,
+        display_name=display_name,
+        note=note,
         relative_path=relative_path,
         url=image_url
     )
@@ -301,6 +311,134 @@ def upload_material(project_id):
         Material info with filename, url, and metadata
     """
     return _handle_material_upload(default_project_id=project_id)
+
+
+@material_bp.route('/<project_id>/materials/<material_id>/edit/image', methods=['POST'])
+def edit_material_image(project_id, material_id):
+    """
+    POST /api/projects/{project_id}/materials/{material_id}/edit/image - Edit a material image (e.g. infographic)
+
+    Supports JSON or multipart/form-data:
+    - edit_instruction: required
+    - template_usage_mode: auto|template|style (optional)
+    - desc_image_urls: JSON array (optional)
+    - context_images: uploaded files (optional, multiple)
+    - aspect_ratio: optional
+    - resolution: optional
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        material = Material.query.get(material_id)
+        if not material or material.project_id != project_id:
+            return not_found('Material')
+
+        # Parse request data (support JSON and multipart/form-data)
+        if request.is_json:
+            data = request.get_json() or {}
+            uploaded_files = []
+        else:
+            data = request.form.to_dict()
+            uploaded_files = request.files.getlist('context_images')
+            if 'desc_image_urls' in data and data['desc_image_urls']:
+                try:
+                    data['desc_image_urls'] = json.loads(data['desc_image_urls'])
+                except Exception:
+                    data['desc_image_urls'] = []
+
+        edit_instruction = data.get('edit_instruction') or data.get('instruction')
+        if not edit_instruction:
+            return bad_request("edit_instruction is required")
+
+        aspect_ratio = (data.get('aspect_ratio') or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')).strip()
+        resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
+
+        # Determine template usage mode
+        context_images = data.get('context_images', {})
+        template_usage_mode = (data.get('template_usage_mode') or '').strip()
+        use_template = None
+        if isinstance(context_images, dict):
+            template_usage_mode = (context_images.get('template_usage_mode') or template_usage_mode or '').strip()
+            if 'use_template' in context_images:
+                use_template = bool(context_images.get('use_template'))
+        else:
+            if 'use_template' in data:
+                raw = data.get('use_template', None)
+                if isinstance(raw, str):
+                    use_template = raw.lower() in ['1', 'true', 'yes']
+                else:
+                    use_template = bool(raw)
+
+        if template_usage_mode == 'template':
+            use_template = True
+        elif template_usage_mode == 'style':
+            use_template = False
+        elif template_usage_mode == 'auto' or template_usage_mode == '':
+            use_template = None
+
+        # Additional reference images
+        additional_ref_images = []
+        desc_image_urls = []
+        if isinstance(context_images, dict):
+            desc_image_urls = context_images.get('desc_image_urls', [])
+        else:
+            desc_image_urls = data.get('desc_image_urls', [])
+        if isinstance(desc_image_urls, str):
+            try:
+                desc_image_urls = json.loads(desc_image_urls)
+            except Exception:
+                desc_image_urls = []
+        if isinstance(desc_image_urls, list):
+            additional_ref_images.extend([str(u) for u in desc_image_urls if u])
+
+        temp_dir = None
+        if uploaded_files:
+            from pathlib import Path
+            temp_dir = Path(tempfile.mkdtemp(dir=current_app.config['UPLOAD_FOLDER']))
+            try:
+                for uploaded_file in uploaded_files:
+                    if uploaded_file.filename:
+                        temp_path = temp_dir / secure_filename(uploaded_file.filename)
+                        uploaded_file.save(str(temp_path))
+                        additional_ref_images.append(str(temp_path))
+            except Exception as e:
+                if temp_dir and temp_dir.exists():
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                raise e
+
+        # Create async task
+        task = Task(project_id=project_id, task_type='EDIT_MATERIAL_IMAGE', status='PENDING')
+        task.set_progress({'total': 1, 'completed': 0, 'failed': 0})
+        db.session.add(task)
+        db.session.commit()
+
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        ai_service = get_ai_service()
+        app = current_app._get_current_object()
+
+        task_manager.submit_task(
+            task.id,
+            edit_material_image_task,
+            project_id,
+            material_id,
+            edit_instruction,
+            ai_service,
+            file_service,
+            aspect_ratio,
+            resolution,
+            additional_ref_images if additional_ref_images else None,
+            use_template,
+            str(temp_dir) if temp_dir else None,
+            app
+        )
+
+        return success_response({'task_id': task.id, 'material_id': material_id, 'status': 'PENDING'}, status_code=202)
+
+    except Exception as e:
+        db.session.rollback()
+        return error_response('AI_SERVICE_ERROR', str(e), 503)
 
 
 @material_global_bp.route('', methods=['GET'])

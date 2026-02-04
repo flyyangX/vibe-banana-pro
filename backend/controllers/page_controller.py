@@ -711,18 +711,27 @@ def edit_page_image(project_id, page_id):
         
         # Collect additional reference images
         additional_ref_images = []
-        
-        # 1. Add template image if requested
+
+        # Determine template usage (auto/template/style)
         context_images = data.get('context_images', {})
+        template_usage_mode = None
+        use_template = None
+
         if isinstance(context_images, dict):
-            use_template = context_images.get('use_template', False)
+            template_usage_mode = (context_images.get('template_usage_mode') or '').strip()
+            if 'use_template' in context_images:
+                use_template = bool(context_images.get('use_template'))
         else:
-            use_template = data.get('use_template', 'false').lower() == 'true'
-        
-        if use_template:
-            template_path = file_service.get_template_path(project_id)
-            if template_path:
-                additional_ref_images.append(template_path)
+            template_usage_mode = (data.get('template_usage_mode') or '').strip()
+            if 'use_template' in data:
+                use_template = str(data.get('use_template', 'false')).lower() == 'true'
+
+        if template_usage_mode == 'template':
+            use_template = True
+        elif template_usage_mode == 'style':
+            use_template = False
+        elif template_usage_mode == 'auto' or template_usage_mode == '':
+            use_template = None
         
         # 2. Add desc image URLs if provided
         if isinstance(context_images, dict):
@@ -790,6 +799,7 @@ def edit_page_image(project_id, page_id):
             current_app.config['DEFAULT_RESOLUTION'],
             original_description,
             additional_ref_images if additional_ref_images else None,
+            use_template,
             str(temp_dir) if temp_dir else None,
             app
         )

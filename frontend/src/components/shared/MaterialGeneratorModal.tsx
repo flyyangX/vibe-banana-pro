@@ -3,7 +3,7 @@ import { Image as ImageIcon, ImagePlus, Upload, X, FolderOpen } from 'lucide-rea
 import { Modal, Textarea, Button, useToast, MaterialSelector, Skeleton } from '@/components/shared';
 import { generateMaterialImage, getTaskStatus } from '@/api/endpoints';
 import { getImageUrl } from '@/api/client';
-import { materialUrlToFile } from './MaterialSelector';
+import { materialUrlToFile } from './MaterialSelector/index';
 import type { Material } from '@/api/endpoints';
 import type { Task } from '@/types';
 
