@@ -15,6 +15,7 @@ interface InfographicCanvasProps {
   onAspectRatioChange: (value: string) => void;
   onResolutionChange: (value: string) => void;
   onEditMaterial: (material: MaterialWithNote) => void;
+  onOpenVersions: (material: MaterialWithNote) => void;
 }
 
 export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
@@ -29,6 +30,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
   onAspectRatioChange,
   onResolutionChange,
   onEditMaterial,
+  onOpenVersions,
 }) => {
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -98,11 +100,11 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
                     style={{ aspectRatio: aspectRatio.replace(':', ' / ') }}
                   >
                     <img
-                      src={getImageUrl(item.url)}
+                      src={getImageUrl(item.url, item.updated_at || item.created_at)}
                       alt="Infographic"
                       className="w-full h-full object-cover"
                       role="button"
-                      onClick={() => window.open(getImageUrl(item.url), '_blank')}
+                      onClick={() => window.open(getImageUrl(item.url, item.updated_at || item.created_at), '_blank')}
                     />
                     {isEditing ? (
                       <div className="absolute inset-0 bg-white/55 backdrop-blur-[1px] flex items-center justify-center">
@@ -127,9 +129,12 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
                       <Button variant="ghost" size="sm" onClick={() => onEditMaterial(item)}>
                         编辑
                       </Button>
+                      <Button variant="ghost" size="sm" onClick={() => onOpenVersions(item)}>
+                        历史
+                      </Button>
                       <button
                         type="button"
-                        onClick={() => window.open(getImageUrl(item.url), '_blank')}
+                        onClick={() => window.open(getImageUrl(item.url, item.updated_at || item.created_at), '_blank')}
                         className="text-banana-600 hover:text-banana-700"
                       >
                         下载

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List
 
 from models import db, Task, Page, Project, Material
+from .helpers import save_material_image_version
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,12 @@ def edit_material_image_task(
 
             # Build new note (preserve + add parent linkage)
             new_note_data = dict(note_data) if isinstance(note_data, dict) else {}
-            new_note_data.setdefault("type", "asset")
+            # Ensure infographic metadata is preserved when editing infographic materials
+            if project.product_type == 'infographic':
+                new_note_data.setdefault("type", "infographic")
+                new_note_data.setdefault("mode", (new_note_data.get("mode") or "single"))
+            else:
+                new_note_data.setdefault("type", "asset")
             new_note_data["source"] = "edit"
             new_note_data["parent_material_id"] = material_id
             new_note = json.dumps(new_note_data, ensure_ascii=False)
@@ -114,6 +120,16 @@ def edit_material_image_task(
             )
             db.session.add(new_material)
             db.session.commit()
+
+            # Save version record (history + current pointer)
+            try:
+                mode = (new_note_data.get('mode') or 'single')
+                page_id = new_note_data.get('page_id', None)
+                if page_id in ['', 'null']:
+                    page_id = None
+                save_material_image_version(project_id, mode, page_id, new_material.id)
+            except Exception as e:
+                logger.warning(f"Failed to save material image version: {e}")
 
             task.status = 'COMPLETED'
             task.completed_at = datetime.utcnow()

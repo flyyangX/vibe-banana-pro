@@ -87,7 +87,7 @@ export function useSlidePreviewState() {
 
   // 版本状态
   const [imageVersions, setImageVersions] = useState<ImageVersion[]>([]);
-  const [showVersionMenu, setShowVersionMenu] = useState(false);
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
 
   // 模板状态
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -229,7 +229,7 @@ export function useSlidePreviewState() {
     try {
       await setCurrentImageVersion(projectId, selectedPage.id, versionId);
       await syncProject(projectId);
-      setShowVersionMenu(false);
+      setIsVersionModalOpen(false);
       show({ message: '已切换到该版本', type: 'success' });
     } catch (error: any) {
       show({
@@ -443,14 +443,14 @@ export function useSlidePreviewState() {
     const loadVersions = async () => {
       if (!currentProject || !projectId || selectedIndex < 0 || selectedIndex >= currentProject.pages.length) {
         setImageVersions([]);
-        setShowVersionMenu(false);
+        setIsVersionModalOpen(false);
         return;
       }
 
       const page = currentProject.pages[selectedIndex];
       if (!page?.id) {
         setImageVersions([]);
-        setShowVersionMenu(false);
+        setIsVersionModalOpen(false);
         return;
       }
 
@@ -556,8 +556,8 @@ export function useSlidePreviewState() {
 
     // Version states
     imageVersions,
-    showVersionMenu,
-    setShowVersionMenu,
+    isVersionModalOpen,
+    setIsVersionModalOpen,
 
     // Template states
     selectedTemplateId,

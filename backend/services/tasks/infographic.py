@@ -10,6 +10,7 @@ from services import ProjectContext
 from utils import get_filtered_pages
 
 from .helpers import _get_project_reference_files_content
+from .helpers import save_material_image_version
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,12 @@ def generate_infographic_task(task_id: str, project_id: str, ai_service, file_se
                 )
                 db.session.add(material)
                 db.session.commit()
+
+                # Save version record for single-mode infographic
+                try:
+                    save_material_image_version(project_id, "single", None, material.id)
+                except Exception as e:
+                    logger.warning(f"Failed to save material version (single): {e}")
 
                 task.status = 'COMPLETED'
                 task.completed_at = datetime.utcnow()
@@ -224,6 +231,10 @@ def generate_infographic_task(task_id: str, project_id: str, ai_service, file_se
                         )
                         db.session.add(material)
                         db.session.commit()
+                        try:
+                            save_material_image_version(project_id, "series", page_id, material.id)
+                        except Exception as e:
+                            logger.warning(f"Failed to save material version (series): {e}")
                         return (page_id, image_url, None)
 
                     except Exception as e:

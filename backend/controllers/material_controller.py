@@ -2,7 +2,7 @@
 Material Controller - handles standalone material image generation
 """
 from flask import Blueprint, request, current_app
-from models import db, Project, Material, Task
+from models import db, Project, Material, Task, MaterialImageVersion
 from utils import success_response, error_response, not_found, bad_request
 from services import FileService
 from services.ai_service_manager import get_ai_service
@@ -288,6 +288,17 @@ def list_materials(project_id):
         materials_list, error = _get_materials_list(project_id)
         if error:
             return error
+
+        # Attach is_current for infographic materials (version system)
+        try:
+            current_versions = MaterialImageVersion.query.filter_by(project_id=project_id, is_current=True).all()
+            current_material_ids = {v.material_id for v in current_versions if v and v.material_id}
+            for m in materials_list:
+                if isinstance(m, dict):
+                    m["is_current"] = m.get("id") in current_material_ids
+        except Exception:
+            # Don't break listing if version table is absent or query fails
+            pass
         
         return success_response({
             "materials": materials_list,
@@ -439,6 +450,147 @@ def edit_material_image(project_id, material_id):
     except Exception as e:
         db.session.rollback()
         return error_response('AI_SERVICE_ERROR', str(e), 503)
+
+
+@material_bp.route('/<project_id>/materials/<material_id>/image-versions', methods=['GET'])
+def get_material_image_versions(project_id, material_id):
+    """
+    GET /api/projects/{project_id}/materials/{material_id}/image-versions
+    Returns all versions for the infographic material group (project+mode+page_id).
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        material = Material.query.get(material_id)
+        if not material or material.project_id != project_id:
+            return not_found('Material')
+
+        # Determine group key from material.note
+        note_data = {}
+        try:
+            if material.note:
+                note_data = json.loads(material.note)
+        except Exception:
+            note_data = {}
+
+        mode = (note_data.get('mode') or 'single').strip().lower()
+        if mode not in ['single', 'series']:
+            mode = 'single'
+        page_id = note_data.get('page_id', None)
+        if page_id in ['', 'null']:
+            page_id = None
+
+        versions = MaterialImageVersion.query.filter_by(
+            project_id=project_id,
+            mode=mode,
+            page_id=page_id
+        ).order_by(MaterialImageVersion.version_number.desc()).all()
+
+        # Lazy backfill: if no version records, build from existing materials of same group by created_at
+        if not versions:
+            group_materials = Material.query.filter_by(project_id=project_id).order_by(Material.created_at.asc()).all()
+            candidates = []
+            for m in group_materials:
+                try:
+                    md = json.loads(m.note) if m.note else {}
+                except Exception:
+                    md = {}
+                if (md.get('type') == 'infographic') and ((md.get('mode') or 'single').strip().lower() == mode):
+                    pid = md.get('page_id', None)
+                    if pid in ['', 'null']:
+                        pid = None
+                    if pid == page_id:
+                        candidates.append(m)
+            if candidates:
+                # Create version rows
+                for idx, m in enumerate(candidates, start=1):
+                    v = MaterialImageVersion(
+                        project_id=project_id,
+                        mode=mode,
+                        page_id=page_id,
+                        material_id=m.id,
+                        version_number=idx,
+                        is_current=False
+                    )
+                    db.session.add(v)
+                # Latest is current
+                latest_version_number = len(candidates)
+                MaterialImageVersion.query.filter_by(project_id=project_id, mode=mode, page_id=page_id).update({'is_current': False})
+                # Flush to get rows; simplest: commit then query again
+                db.session.commit()
+                latest = MaterialImageVersion.query.filter_by(project_id=project_id, mode=mode, page_id=page_id, version_number=latest_version_number).first()
+                if latest:
+                    latest.is_current = True
+                    db.session.commit()
+            versions = MaterialImageVersion.query.filter_by(
+                project_id=project_id,
+                mode=mode,
+                page_id=page_id
+            ).order_by(MaterialImageVersion.version_number.desc()).all()
+
+        version_payload = []
+        for v in versions:
+            m = Material.query.get(v.material_id)
+            version_payload.append({
+                **v.to_dict(),
+                'material_url': m.url if m else None,
+                'display_name': m.display_name if m else None,
+                'material_created_at': m.created_at.isoformat() if m and m.created_at else None,
+                'material_updated_at': m.updated_at.isoformat() if m and m.updated_at else None,
+            })
+
+        return success_response({'versions': version_payload})
+    except Exception as e:
+        db.session.rollback()
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@material_bp.route('/<project_id>/materials/<material_id>/image-versions/<version_id>/set-current', methods=['POST'])
+def set_material_current_version(project_id, material_id, version_id):
+    """
+    POST /api/projects/{project_id}/materials/{material_id}/image-versions/{version_id}/set-current
+    Set a specific version as current for the material group.
+    """
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return not_found('Project')
+
+        material = Material.query.get(material_id)
+        if not material or material.project_id != project_id:
+            return not_found('Material')
+
+        version = MaterialImageVersion.query.get(version_id)
+        if not version or version.project_id != project_id:
+            return not_found('MaterialImageVersion')
+
+        # Ensure same group as the material
+        note_data = {}
+        try:
+            if material.note:
+                note_data = json.loads(material.note)
+        except Exception:
+            note_data = {}
+        mode = (note_data.get('mode') or 'single').strip().lower()
+        if mode not in ['single', 'series']:
+            mode = 'single'
+        page_id = note_data.get('page_id', None)
+        if page_id in ['', 'null']:
+            page_id = None
+
+        if version.mode != mode or version.page_id != page_id:
+            return bad_request("Version does not belong to this material group")
+
+        MaterialImageVersion.query.filter_by(project_id=project_id, mode=mode, page_id=page_id).update({'is_current': False})
+        version.is_current = True
+        db.session.commit()
+
+        return success_response({'version_id': version.id, 'material_id': material_id})
+    except Exception as e:
+        db.session.rollback()
+        return error_response('SERVER_ERROR', str(e), 500)
 
 
 @material_global_bp.route('', methods=['GET'])

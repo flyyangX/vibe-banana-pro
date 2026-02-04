@@ -38,6 +38,8 @@ export interface Material {
   url: string;
   relative_path: string;
   created_at: string;
+  updated_at?: string;
+  is_current?: boolean;
   // 可选的附加信息：用于展示友好名称
   prompt?: string;
   original_filename?: string;
@@ -204,6 +206,25 @@ export interface RefineResponse {
 
 export interface XhsCardImageVersionsResponse {
   versions: XhsCardImageVersion[];
+}
+
+export interface MaterialImageVersion {
+  version_id: string;
+  project_id: string;
+  mode: 'single' | 'series' | string;
+  page_id?: string | null;
+  material_id: string;
+  version_number: number;
+  is_current: boolean;
+  created_at?: string;
+  material_url?: string | null;
+  display_name?: string | null;
+  material_created_at?: string | null;
+  material_updated_at?: string | null;
+}
+
+export interface MaterialImageVersionsResponse {
+  versions: MaterialImageVersion[];
 }
 
 export interface PageImageVersionsResponse {

@@ -280,6 +280,35 @@ export const setCurrentImageVersion = async (
   return response.data;
 };
 
+// ===== Material 图片版本 API（用于信息图等） =====
+
+/**
+ * 获取 Material 图片历史版本
+ */
+export const getMaterialImageVersions = async (
+  projectId: string,
+  materialId: string
+): Promise<ApiResponse<{ versions: import('./types').MaterialImageVersion[] }>> => {
+  const response = await apiClient.get<ApiResponse<{ versions: import('./types').MaterialImageVersion[] }>>(
+    `/api/projects/${projectId}/materials/${materialId}/image-versions`
+  );
+  return response.data;
+};
+
+/**
+ * 设置 Material 当前使用的图片版本
+ */
+export const setCurrentMaterialImageVersion = async (
+  projectId: string,
+  materialId: string,
+  versionId: string
+): Promise<ApiResponse> => {
+  const response = await apiClient.post<ApiResponse>(
+    `/api/projects/${projectId}/materials/${materialId}/image-versions/${versionId}/set-current`
+  );
+  return response.data;
+};
+
 /**
  * 清除单页图片（重置为未生成）
  */

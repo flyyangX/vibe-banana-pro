@@ -22,9 +22,22 @@ from .task import Task
 from .user_template import UserTemplate
 from .page_image_version import PageImageVersion
 from .xhs_card_image_version import XhsCardImageVersion
+from .material_image_version import MaterialImageVersion
 from .material import Material
 from .reference_file import ReferenceFile
 from .settings import Settings
 
-__all__ = ['db', 'Project', 'Page', 'Task', 'UserTemplate', 'PageImageVersion', 'XhsCardImageVersion', 'Material', 'ReferenceFile', 'Settings']
+__all__ = [
+    'db',
+    'Project',
+    'Page',
+    'Task',
+    'UserTemplate',
+    'PageImageVersion',
+    'XhsCardImageVersion',
+    'MaterialImageVersion',
+    'Material',
+    'ReferenceFile',
+    'Settings'
+]
 

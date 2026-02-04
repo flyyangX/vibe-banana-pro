@@ -8,7 +8,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/shared';
-import { getImageUrl } from '@/api/client';
 import type { Page, ImageVersion } from '@/types';
 
 interface PreviewCanvasProps {
@@ -18,12 +17,10 @@ interface PreviewCanvasProps {
   selectedPage?: Page;
   imageUrl: string;
   imageVersions: ImageVersion[];
-  showVersionMenu: boolean;
   isRefreshing: boolean;
   pageGeneratingTasks: Record<string, string>;
   onSelectIndex: (index: number) => void;
-  onSetShowVersionMenu: (show: boolean) => void;
-  onSwitchVersion: (versionId: string) => void;
+  onOpenVersions: () => void;
   onEditPage: () => void;
   onClearPageImage: () => void;
   onRegeneratePage: () => void;
@@ -41,12 +38,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   selectedPage,
   imageUrl,
   imageVersions,
-  showVersionMenu,
   isRefreshing,
   pageGeneratingTasks,
   onSelectIndex,
-  onSetShowVersionMenu,
-  onSwitchVersion,
+  onOpenVersions,
   onEditPage,
   onClearPageImage,
   onRegeneratePage,
@@ -197,51 +192,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
               title="刷新"
             />
             {imageVersions.length > 1 && (
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onSetShowVersionMenu(!showVersionMenu)}
-                  className="text-xs md:text-sm"
-                >
-                  <span className="hidden md:inline">历史版本 ({imageVersions.length})</span>
-                  <span className="md:hidden">版本</span>
-                </Button>
-                {showVersionMenu && (
-                  <div className="absolute right-0 bottom-full mb-2 w-56 md:w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20 max-h-96 overflow-y-auto">
-                    {imageVersions.map((version) => (
-                      <button
-                        key={version.version_id}
-                        onClick={() => onSwitchVersion(version.version_id)}
-                        className={`w-full px-3 md:px-4 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between text-xs md:text-sm ${
-                          version.is_current ? 'bg-banana-50' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>
-                            版本 {version.version_number}
-                          </span>
-                          {version.is_current && (
-                            <span className="text-xs text-banana-600 font-medium">
-                              (当前)
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-gray-400 hidden md:inline">
-                          {version.created_at
-                            ? new Date(version.created_at).toLocaleString('zh-CN', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : ''}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <Button variant="ghost" size="sm" onClick={onOpenVersions} className="text-xs md:text-sm">
+                <span className="hidden md:inline">历史版本 ({imageVersions.length})</span>
+                <span className="md:hidden">版本</span>
+              </Button>
             )}
             <Button
               variant="secondary"

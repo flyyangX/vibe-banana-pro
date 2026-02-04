@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from sqlalchemy import func
 
-from models import db, Page, Project, Material, PageImageVersion, XhsCardImageVersion, ReferenceFile
+from models import db, Page, Project, Material, PageImageVersion, XhsCardImageVersion, MaterialImageVersion, ReferenceFile
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +183,38 @@ def save_xhs_card_version(project_id: str, card_index: int, material_id: str) ->
     version = XhsCardImageVersion(
         project_id=project_id,
         index=card_index,
+        material_id=material_id,
+        version_number=next_version,
+        is_current=True
+    )
+    db.session.add(version)
+    db.session.commit()
+    return version
+
+
+def save_material_image_version(project_id: str, mode: str, page_id: str | None, material_id: str) -> MaterialImageVersion:
+    """
+    保存 Material 的历史版本，并标记为当前版本。
+
+    用于信息图（infographic）这种“以 Material 为渲染对象”的产品。
+    分组维度：project_id + mode + page_id（single 模式可为 None）
+    """
+    safe_mode = (mode or 'single').strip().lower()
+    if safe_mode not in ['single', 'series']:
+        safe_mode = 'single'
+    safe_page_id = page_id or None
+
+    max_version = db.session.query(func.max(MaterialImageVersion.version_number))\
+        .filter_by(project_id=project_id, mode=safe_mode, page_id=safe_page_id).scalar() or 0
+    next_version = max_version + 1
+
+    MaterialImageVersion.query.filter_by(project_id=project_id, mode=safe_mode, page_id=safe_page_id)\
+        .update({'is_current': False})
+
+    version = MaterialImageVersion(
+        project_id=project_id,
+        mode=safe_mode,
+        page_id=safe_page_id,
         material_id=material_id,
         version_number=next_version,
         is_current=True

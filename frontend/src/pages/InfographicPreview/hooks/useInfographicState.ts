@@ -11,8 +11,11 @@ import {
   uploadTemplate,
   deleteTemplate,
   editMaterialImage,
+  getMaterialImageVersions,
+  setCurrentMaterialImageVersion,
 } from '@/api/endpoints';
 import type { Material, UserTemplate } from '@/api/endpoints';
+import type { MaterialImageVersion } from '@/api/types';
 import type { ExportExtractorMethod, ExportInpaintMethod } from '@/types';
 import { useProjectStore } from '@/store/useProjectStore';
 import { getTemplateFile } from '@/components/shared/TemplateSelector/index';
@@ -89,6 +92,13 @@ export function useInfographicState() {
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isEditingGenerating, setIsEditingGenerating] = useState(false);
   const [editingMaterialIds, setEditingMaterialIds] = useState<string[]>([]);
+
+  // 历史版本（对齐 Slide/Xhs）
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
+  const [versionTargetMaterialId, setVersionTargetMaterialId] = useState<string | null>(null);
+  const [versionList, setVersionList] = useState<MaterialImageVersion[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [isSwitchingVersion, setIsSwitchingVersion] = useState(false);
 
   const payloadMode = useMemo(() => {
     if (!currentProject?.product_payload) return null;
@@ -195,24 +205,34 @@ export function useInfographicState() {
   const filteredMaterials = useMemo(() => {
     const list = materials.filter((m) => m.noteData?.type === 'infographic' && m.noteData?.mode === mode);
     if (mode === 'series') {
-      // 对每个 page_id 只取最新一张，避免生成/编辑后出现重复
-      const latestByPageId = new Map<string, MaterialWithNote>();
+      // 对每个 page_id：优先取“当前版本”，否则取最新一张
+      const pickedByPageId = new Map<string, MaterialWithNote>();
       list.forEach((m) => {
         const pid = m.noteData?.page_id || m.id;
-        const existing = latestByPageId.get(pid);
+        const existing = pickedByPageId.get(pid);
         if (!existing) {
-          latestByPageId.set(pid, m);
+          pickedByPageId.set(pid, m);
           return;
         }
-        const prevTime = new Date(existing.created_at || 0).getTime();
-        const nextTime = new Date(m.created_at || 0).getTime();
-        if (nextTime >= prevTime) {
-          latestByPageId.set(pid, m);
+
+        // 如果新的 m 是 current，覆盖
+        if (m.is_current && !existing.is_current) {
+          pickedByPageId.set(pid, m);
+          return;
+        }
+        // 如果两者都是 current 或都不是，取更新时间更晚的
+        const prevTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+        const nextTime = new Date(m.updated_at || m.created_at || 0).getTime();
+        if (nextTime >= prevTime && (!existing.is_current || m.is_current === existing.is_current)) {
+          pickedByPageId.set(pid, m);
         }
       });
-      return Array.from(latestByPageId.values()).sort((a, b) => (a.noteData?.order_index ?? 0) - (b.noteData?.order_index ?? 0));
+      return Array.from(pickedByPageId.values()).sort((a, b) => (a.noteData?.order_index ?? 0) - (b.noteData?.order_index ?? 0));
     }
-    return list.sort((a, b) => (a.created_at > b.created_at ? -1 : 1));
+    // single：优先取 current，否则取最新
+    const currents = list.filter((m) => m.is_current);
+    const base = currents.length > 0 ? currents : list;
+    return base.sort((a, b) => ((a.updated_at || a.created_at) > (b.updated_at || b.created_at) ? -1 : 1));
   }, [materials, mode]);
 
   const displayMaterials = useMemo(
@@ -413,13 +433,15 @@ export function useInfographicState() {
                 source: 'edit',
                 parent_material_id: editTargetMaterial.id,
               } as any;
+              const nowIso = new Date().toISOString();
               setMaterials((prev) => {
                 const next = prev.filter((m) => m.id !== newMaterialId);
                 next.unshift({
                   ...editTargetMaterial,
                   id: newMaterialId,
                   url: newImageUrl,
-                  created_at: new Date().toISOString(),
+                  created_at: nowIso,
+                  updated_at: nowIso,
                   note: JSON.stringify(optimisticNoteData),
                   noteData: optimisticNoteData,
                 });
@@ -470,6 +492,45 @@ export function useInfographicState() {
     loadMaterials,
     show,
   ]);
+
+  const openVersionModal = useCallback(
+    async (material: MaterialWithNote) => {
+      if (!projectId) return;
+      setIsVersionModalOpen(true);
+      setVersionTargetMaterialId(material.id);
+      setIsLoadingVersions(true);
+      try {
+        const response = await getMaterialImageVersions(projectId, material.id);
+        setVersionList((response.data?.versions || []) as MaterialImageVersion[]);
+      } catch (e: any) {
+        show({ message: e.message || '加载版本失败', type: 'error' });
+        setVersionList([]);
+      } finally {
+        setIsLoadingVersions(false);
+      }
+    },
+    [projectId, getMaterialImageVersions, show]
+  );
+
+  const handleSwitchVersion = useCallback(
+    async (versionId: string) => {
+      if (!projectId || !versionTargetMaterialId || isSwitchingVersion) return;
+      setIsSwitchingVersion(true);
+      try {
+        await setCurrentMaterialImageVersion(projectId, versionTargetMaterialId, versionId);
+        await loadMaterials();
+        // reload versions
+        const response = await getMaterialImageVersions(projectId, versionTargetMaterialId);
+        setVersionList((response.data?.versions || []) as MaterialImageVersion[]);
+        show({ message: '已切换到该版本', type: 'success' });
+      } catch (e: any) {
+        show({ message: e.message || '切换失败', type: 'error' });
+      } finally {
+        setIsSwitchingVersion(false);
+      }
+    },
+    [projectId, versionTargetMaterialId, isSwitchingVersion, loadMaterials, show]
+  );
 
   const handleSaveExtraRequirements = useCallback(async () => {
     if (!currentProject || !projectId) return;
@@ -663,6 +724,15 @@ export function useInfographicState() {
     // Edit modal (infographic material edit)
     isEditingGenerating,
     editingMaterialIds,
+    // Versions
+    isVersionModalOpen,
+    setIsVersionModalOpen,
+    versionTargetMaterialId,
+    versionList,
+    isLoadingVersions,
+    isSwitchingVersion,
+    openVersionModal,
+    handleSwitchVersion,
     isEditModalOpen,
     setIsEditModalOpen,
     editTargetMaterial,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check, Download, AlertTriangle } from 'lucide-react';
-import { Button, Loading, Modal, PageEditModal } from '@/components/shared';
+import { Button, ImageVersionsModal, Loading, Modal, PageEditModal } from '@/components/shared';
 import { MaterialGeneratorModal, MaterialSelector, ProjectSettingsModal, TemplateSelector } from '@/components/shared';
 import { getImageUrl } from '@/api/client';
 import { useXhsPreviewState } from '@/hooks/useXhsPreviewState';
@@ -341,71 +341,34 @@ export const XhsPreview: React.FC = () => {
       />
 
       {/* 历史版本弹窗 */}
-      <Modal
+      <ImageVersionsModal
         isOpen={isVersionModalOpen}
         onClose={() => setIsVersionModalOpen(false)}
         title={versionTargetIndex !== null ? `历史版本（第 ${versionTargetIndex + 1} 张）` : '历史版本'}
-        size="lg"
-      >
-        <div className="space-y-4">
-          {isLoadingVersions ? (
-            <Loading message="加载版本中..." />
-          ) : (
-            <>
-              {versionList.length > 0 ? (
-                <div className="grid grid-cols-3 gap-3">
-                  {versionList.map((version) => {
-                    const previewUrl =
-                      version.source === 'page'
-                        ? version.image_url
-                          ? getImageUrl(version.image_url, version.created_at)
-                          : null
-                        : version.material_url
-                          ? getImageUrl(version.material_url, version.material_created_at || version.created_at)
-                          : null;
-                    return (
-                      <button
-                        key={version.version_id}
-                        type="button"
-                        onClick={() =>
-                          versionTargetIndex !== null && handleSwitchVersion(version, versionTargetIndex)
-                        }
-                        disabled={isSwitchingVersion}
-                        className={`relative rounded border overflow-hidden ${
-                          version.is_current ? 'border-banana-500 ring-2 ring-banana-200' : 'border-gray-200'
-                        }`}
-                      >
-                        {previewUrl ? (
-                          <img src={previewUrl} alt="version" className="w-full h-32 object-cover" />
-                        ) : (
-                          <div className="w-full h-32 bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                            无预览
-                          </div>
-                        )}
-                        {version.is_current && (
-                          <div className="absolute inset-0 bg-banana-500/20 flex items-center justify-center text-xs text-white">
-                            当前
-                          </div>
-                        )}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[10px] px-2 py-1">
-                          版本 {version.version_number}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">暂无历史版本</div>
-              )}
-            </>
-          )}
-          <div className="flex justify-end">
-            <Button variant="ghost" onClick={() => setIsVersionModalOpen(false)}>
-              关闭
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        isLoading={isLoadingVersions}
+        isSwitching={isSwitchingVersion}
+        versions={versionList.map((version) => {
+          const previewUrl =
+            version.source === 'page'
+              ? version.image_url
+                ? getImageUrl(version.image_url, version.created_at)
+                : null
+              : version.material_url
+                ? getImageUrl(version.material_url, version.material_created_at || version.created_at)
+                : null;
+          return {
+            versionId: version.version_id,
+            versionNumber: version.version_number,
+            isCurrent: version.is_current,
+            previewUrl,
+          };
+        })}
+        onSelectVersion={(versionId) => {
+          const version = versionList.find((v) => v.version_id === versionId);
+          if (!version || versionTargetIndex === null) return;
+          handleSwitchVersion(version, versionTargetIndex);
+        }}
+      />
 
       {projectId && (
         <>

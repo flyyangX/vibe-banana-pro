@@ -2,7 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getImageUrl } from '@/api/client';
 import { exportProject } from '@/api/endpoints';
-import { Loading } from '@/components/shared';
+import { ImageVersionsModal, Loading } from '@/components/shared';
 
 import { PreviewToolbar } from './components/PreviewToolbar';
 import { PreviewCanvas } from './components/PreviewCanvas';
@@ -60,8 +60,8 @@ export const SlidePreview: React.FC = () => {
     getSelectedPageIdsForExport,
     selectedExportableCount,
     imageVersions,
-    showVersionMenu,
-    setShowVersionMenu,
+    isVersionModalOpen,
+    setIsVersionModalOpen,
     isBatchPreparing,
     batchPreparingText,
     startBatchPreparing,
@@ -319,12 +319,10 @@ export const SlidePreview: React.FC = () => {
             selectedPage={selectedPage}
             imageUrl={imageUrl}
             imageVersions={imageVersions}
-            showVersionMenu={showVersionMenu}
             isRefreshing={isRefreshing}
             pageGeneratingTasks={pageGeneratingTasks}
             onSelectIndex={setSelectedIndex}
-            onSetShowVersionMenu={setShowVersionMenu}
-            onSwitchVersion={handleSwitchVersion}
+            onOpenVersions={() => setIsVersionModalOpen(true)}
             onEditPage={() => handleEditPage()}
             onClearPageImage={handleClearPageImage}
             onRegeneratePage={handleRegeneratePage}
@@ -364,6 +362,21 @@ export const SlidePreview: React.FC = () => {
         extractImageUrlsFromDescription={extractImageUrlsFromDescription}
         showToast={show}
       />
+
+          <ImageVersionsModal
+            isOpen={isVersionModalOpen}
+            onClose={() => setIsVersionModalOpen(false)}
+            title={`历史版本（第 ${selectedIndex + 1} 页）`}
+            isLoading={false}
+            isSwitching={false}
+            versions={imageVersions.map((v) => ({
+              versionId: v.version_id,
+              versionNumber: v.version_number,
+              isCurrent: v.is_current,
+              previewUrl: v.image_url ? getImageUrl(v.image_url, v.created_at) : null,
+            }))}
+            onSelectVersion={handleSwitchVersion}
+          />
 
       <ToastContainer />
       {ConfirmDialog}

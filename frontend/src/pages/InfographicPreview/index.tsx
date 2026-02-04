@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loading, PageEditModal } from '@/components/shared';
+import { ImageVersionsModal, Loading, PageEditModal } from '@/components/shared';
 import { getImageUrl } from '@/api/client';
 import { useInfographicState } from './hooks/useInfographicState';
 import { InfographicToolbar } from './components/InfographicToolbar';
@@ -39,6 +39,7 @@ export const InfographicPreview: React.FC = () => {
         onAspectRatioChange={state.setAspectRatio}
         onResolutionChange={state.setResolution}
         onEditMaterial={state.openEditModal}
+        onOpenVersions={state.openVersionModal}
       />
 
       <state.ToastContainer />
@@ -47,7 +48,11 @@ export const InfographicPreview: React.FC = () => {
         isOpen={state.isEditModalOpen}
         onClose={() => state.setIsEditModalOpen(false)}
         title="编辑信息图"
-        imageUrl={state.editTargetMaterial ? getImageUrl(state.editTargetMaterial.url) : null}
+        imageUrl={
+          state.editTargetMaterial
+            ? getImageUrl(state.editTargetMaterial.url, state.editTargetMaterial.updated_at || state.editTargetMaterial.created_at)
+            : null
+        }
         previewAspectRatio={state.aspectRatio}
         showOutline
         outlineTitle={state.editOutlineTitle}
@@ -86,6 +91,23 @@ export const InfographicPreview: React.FC = () => {
         toast={state.show}
       />
 
+      <ImageVersionsModal
+        isOpen={state.isVersionModalOpen}
+        onClose={() => state.setIsVersionModalOpen(false)}
+        title="历史版本（信息图）"
+        isLoading={state.isLoadingVersions}
+        isSwitching={state.isSwitchingVersion}
+        versions={state.versionList.map((v) => ({
+          versionId: v.version_id,
+          versionNumber: v.version_number,
+          isCurrent: v.is_current,
+          previewUrl: v.material_url
+            ? getImageUrl(v.material_url, v.material_updated_at || v.material_created_at || v.created_at)
+            : null,
+        }))}
+        onSelectVersion={state.handleSwitchVersion}
+      />
+
       <InfographicSidebar
         projectId={state.projectId}
         isMaterialModalOpen={state.isMaterialModalOpen}
@@ -114,7 +136,6 @@ export const InfographicPreview: React.FC = () => {
         selectedPresetTemplateId={state.selectedPresetTemplateId}
         templateVariants={state.currentProject?.template_variants}
         templateVariantsHistory={state.currentProject?.template_variants_history}
-        userTemplates={state.userTemplates}
         onTemplateSelect={state.handleTemplateSelect}
         onClearTemplate={state.handleClearTemplate}
         isUploadingTemplate={state.isUploadingTemplate}

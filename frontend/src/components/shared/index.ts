@@ -25,4 +25,6 @@ export { ExportTasksPanel } from './ExportTasksPanel';
 export { TemplateSelector, getTemplateFile, presetTemplates } from './TemplateSelector/index';
 export { PageEditModal } from './PageEditModal';
 export type { TemplateUsageMode } from './PageEditModal';
+export { ImageVersionsModal } from './ImageVersionsModal';
+export type { ImageVersionGridItem } from './ImageVersionsModal';
 
