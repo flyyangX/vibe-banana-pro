@@ -22,6 +22,10 @@ export const OutlineEditor: React.FC = () => {
     setOutlinePageCount,
     infographicMode,
     setInfographicMode,
+    pptAspectRatio,
+    setPptAspectRatio,
+    infographicAspectRatio,
+    setInfographicAspectRatio,
     xhsAspectRatio,
     setXhsAspectRatio,
     isGlobalLoading,
@@ -102,6 +106,10 @@ export const OutlineEditor: React.FC = () => {
           setOutlinePageCount={setOutlinePageCount}
           infographicMode={infographicMode}
           setInfographicMode={setInfographicMode}
+          pptAspectRatio={pptAspectRatio}
+          setPptAspectRatio={setPptAspectRatio}
+          infographicAspectRatio={infographicAspectRatio}
+          setInfographicAspectRatio={setInfographicAspectRatio}
           xhsAspectRatio={xhsAspectRatio}
           setXhsAspectRatio={setXhsAspectRatio}
           sensors={sensors}

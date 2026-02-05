@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Button, Modal, Textarea } from '@/components/shared';
 
-type XhsAspectRatio = '4:5' | '3:4' | '9:16';
+type XhsAspectRatio = '4:5' | '3:4' | 'auto';
 type TemplateUsageMode = 'auto' | 'template' | 'style';
 
 export interface XhsEditModalProps {
@@ -55,11 +55,10 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
   const [selectionRect, setSelectionRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
   const aspectRatioClass = (() => {
-    switch (aspectRatio) {
+    const effectiveRatio = aspectRatio === 'auto' ? '3:4' : aspectRatio;
+    switch (effectiveRatio) {
       case '3:4':
         return 'aspect-[3/4]';
-      case '9:16':
-        return 'aspect-[9/16]';
       case '4:5':
       default:
         return 'aspect-[4/5]';

@@ -37,8 +37,8 @@ export function useXhsPreviewState() {
 
   const [aspectRatio, setAspectRatio] = useState<XhsAspectRatio>(() => {
     const ratio = (location.state as any)?.aspectRatio;
-    if (ratio === '3:4' || ratio === '9:16') return ratio;
-    return '4:5';
+    if (ratio === '3:4' || ratio === '4:5' || ratio === 'auto') return ratio;
+    return '3:4';
   });
   const imageCount = useMemo(() => {
     const count = currentProject?.pages?.length;
@@ -112,10 +112,12 @@ export function useXhsPreviewState() {
 
   useEffect(() => {
     const stateRatio = (location.state as any)?.aspectRatio;
-    if (stateRatio === '4:5' || stateRatio === '3:4' || stateRatio === '9:16') return;
+    if (stateRatio === '4:5' || stateRatio === '3:4' || stateRatio === 'auto') return;
     const ratio = (xhsPayload?.aspect_ratio || '').trim();
-    if (ratio === '4:5' || ratio === '3:4' || ratio === '9:16') {
+    if (ratio === '4:5' || ratio === '3:4') {
       setAspectRatio(ratio);
+    } else if (ratio === 'auto') {
+      setAspectRatio('auto');
     }
   }, [xhsPayload?.aspect_ratio, location.state]);
 
@@ -577,7 +579,7 @@ export function useXhsPreviewState() {
           try {
             const response = await generateXhsCard(projectId, {
               index,
-              aspectRatio,
+              aspectRatio: aspectRatio === 'auto' ? undefined : aspectRatio,
               useTemplate: useTemplateOption,
               templateUsageMode,
             });
@@ -718,7 +720,7 @@ export function useXhsPreviewState() {
       try {
         const response = await generateXhsCard(projectId, {
           index,
-          aspectRatio,
+          aspectRatio: aspectRatio === 'auto' ? undefined : aspectRatio,
           useTemplate: useTemplateOption,
           templateUsageMode,
         });
@@ -959,11 +961,10 @@ export function useXhsPreviewState() {
   }, [confirm, handleGenerate]);
 
   const aspectRatioClass = useMemo(() => {
-    switch (aspectRatio) {
+    const effectiveRatio = aspectRatio === 'auto' ? '3:4' : aspectRatio;
+    switch (effectiveRatio) {
       case '3:4':
         return 'aspect-[3/4]';
-      case '9:16':
-        return 'aspect-[9/16]';
       default:
         return 'aspect-[4/5]';
     }

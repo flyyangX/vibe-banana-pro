@@ -21,7 +21,7 @@ def get_xhs_blueprint_prompt(
     project_context: 'ProjectContext',
     outline_text: str = "",
     image_count: int = 7,
-    aspect_ratio: str = "4:5",
+    aspect_ratio: str = "3:4",
     language: str = None
 ) -> str:
     """
@@ -35,7 +35,9 @@ def get_xhs_blueprint_prompt(
     style_text = (getattr(project_context, 'template_style', '') or '').strip()
     safe_count = int(image_count or 7)
     safe_count = min(9, max(6, safe_count))
-    aspect_ratio = (aspect_ratio or "4:5").strip()
+    aspect_ratio = (aspect_ratio or "3:4").strip()
+    if aspect_ratio == "auto":
+        aspect_ratio = "3:4"
 
     prompt = f"""\
 你是一名"小红书图文内容策划 + 信息卡片编辑"。请将输入内容整理成一个可直接生成"竖版轮播图文"的结构化蓝图（JSON）。
@@ -123,7 +125,7 @@ def get_xhs_blueprint_prompt(
 def get_xhs_image_prompt(
     card: Dict,
     style_pack: Dict,
-    aspect_ratio: str = "4:5",
+    aspect_ratio: str = "3:4",
     total: int = 7,
     language: str = None
 ) -> str:

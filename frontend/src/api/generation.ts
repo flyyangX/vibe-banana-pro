@@ -205,7 +205,7 @@ export const generateXhs = async (
   projectId: string,
   options?: {
     imageCount?: number; // 6-9
-    aspectRatio?: '4:5' | '3:4' | '9:16';
+    aspectRatio?: '4:5' | '3:4' | 'auto';
     resolution?: string;
     maxWorkers?: number;
     useTemplate?: boolean;
@@ -214,12 +214,13 @@ export const generateXhs = async (
   }
 ): Promise<ApiResponse> => {
   const lang = options?.language || await getStoredOutputLanguage();
+  const safeAspectRatio = options?.aspectRatio && options.aspectRatio !== 'auto' ? options.aspectRatio : undefined;
   const response = await apiClient.post<ApiResponse>(
     `/api/projects/${projectId}/generate/xhs`,
     {
       language: lang,
       ...(typeof options?.imageCount === 'number' ? { image_count: options.imageCount } : {}),
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(safeAspectRatio ? { aspect_ratio: safeAspectRatio } : {}),
       ...(options?.resolution ? { resolution: options.resolution } : {}),
       ...(options?.maxWorkers ? { max_workers: options.maxWorkers } : {}),
       ...(typeof options?.useTemplate === 'boolean' ? { use_template: options.useTemplate } : {}),
@@ -236,7 +237,7 @@ export const generateXhsCard = async (
   projectId: string,
   options: {
     index: number;
-    aspectRatio?: '4:5' | '3:4' | '9:16';
+    aspectRatio?: '4:5' | '3:4' | 'auto';
     resolution?: string;
     useTemplate?: boolean;
     templateUsageMode?: 'auto' | 'template' | 'style';
@@ -244,12 +245,13 @@ export const generateXhsCard = async (
   }
 ): Promise<ApiResponse> => {
   const lang = options?.language || await getStoredOutputLanguage();
+  const safeAspectRatio = options?.aspectRatio && options.aspectRatio !== 'auto' ? options.aspectRatio : undefined;
   const response = await apiClient.post<ApiResponse>(
     `/api/projects/${projectId}/generate/xhs/card`,
     {
       index: options.index,
       language: lang,
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(safeAspectRatio ? { aspect_ratio: safeAspectRatio } : {}),
       ...(options?.resolution ? { resolution: options.resolution } : {}),
       ...(typeof options?.useTemplate === 'boolean' ? { use_template: options.useTemplate } : {}),
       ...(options?.templateUsageMode ? { template_usage_mode: options.templateUsageMode } : {}),
@@ -266,7 +268,7 @@ export const editXhsCardImage = async (
   options: {
     index: number;
     editInstruction: string;
-    aspectRatio?: '4:5' | '3:4' | '9:16';
+    aspectRatio?: '4:5' | '3:4' | 'auto';
     resolution?: string;
     templateUsageMode?: 'auto' | 'template' | 'style';
     descImageUrls?: string[];
@@ -276,7 +278,7 @@ export const editXhsCardImage = async (
   const formData = new FormData();
   formData.append('index', String(options.index));
   formData.append('edit_instruction', options.editInstruction);
-  if (options.aspectRatio) {
+  if (options.aspectRatio && options.aspectRatio !== 'auto') {
     formData.append('aspect_ratio', options.aspectRatio);
   }
   if (options.resolution) {
@@ -304,17 +306,18 @@ export const editXhsCardImage = async (
 export const generateXhsBlueprint = async (
   projectId: string,
   options?: {
-    aspectRatio?: '4:5' | '3:4' | '9:16';
+    aspectRatio?: '4:5' | '3:4' | 'auto';
     language?: OutputLanguage;
     copywritingOnly?: boolean;
   }
 ): Promise<ApiResponse> => {
   const lang = options?.language || await getStoredOutputLanguage();
+  const safeAspectRatio = options?.aspectRatio && options.aspectRatio !== 'auto' ? options.aspectRatio : undefined;
   const response = await apiClient.post<ApiResponse>(
     `/api/projects/${projectId}/generate/xhs/blueprint`,
     {
       language: lang,
-      ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+      ...(safeAspectRatio ? { aspect_ratio: safeAspectRatio } : {}),
       ...(options?.copywritingOnly ? { copywriting_only: true } : {}),
     }
   );

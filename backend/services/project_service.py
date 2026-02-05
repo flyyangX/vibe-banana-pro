@@ -603,8 +603,9 @@ class ProjectService:
         offset = max(0, offset)  # Non-negative
 
         # Fetch limit + 1 items to check for more pages efficiently
+        # joinedload materials for infographic/xhs projects (thumbnail & status in history)
         projects_with_extra = Project.query\
-            .options(joinedload(Project.pages))\
+            .options(joinedload(Project.pages), joinedload(Project.materials))\
             .order_by(desc(Project.updated_at))\
             .limit(limit + 1)\
             .offset(offset)\

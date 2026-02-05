@@ -32,6 +32,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
   onEditMaterial,
   onOpenVersions,
 }) => {
+  const effectiveAspectRatio = aspectRatio === 'auto' ? '16:9' : aspectRatio;
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-4">
@@ -51,6 +52,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
               onChange={(e) => onAspectRatioChange(e.target.value)}
               className="px-2 py-1 border border-gray-200 rounded text-xs"
             >
+              <option value="auto">自动</option>
               <option value="1:1">1:1</option>
               <option value="16:9">16:9</option>
               <option value="9:16">9:16</option>
@@ -97,7 +99,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
                 >
                   <div
                     className="relative bg-gray-50"
-                    style={{ aspectRatio: aspectRatio.replace(':', ' / ') }}
+                  style={{ aspectRatio: effectiveAspectRatio.replace(':', ' / ') }}
                   >
                     <img
                       src={getImageUrl(item.url, item.updated_at || item.created_at)}
@@ -154,7 +156,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
                   >
                     <div
                       className="relative"
-                      style={{ aspectRatio: aspectRatio.replace(':', ' / ') }}
+                      style={{ aspectRatio: effectiveAspectRatio.replace(':', ' / ') }}
                     >
                       <Skeleton className="w-full h-full" />
                       <div className="absolute bottom-2 left-2 text-xs text-gray-500 bg-white/80 border border-gray-200 rounded px-2 py-0.5">

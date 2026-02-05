@@ -1,6 +1,6 @@
 import type { Material, UserTemplate } from '@/api/endpoints';
 
-export type XhsAspectRatio = '4:5' | '3:4' | '9:16';
+export type XhsAspectRatio = '4:5' | '3:4' | 'auto';
 
 export type MaterialWithNote = Material & {
   noteData?: {

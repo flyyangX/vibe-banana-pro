@@ -64,7 +64,7 @@ export function useInfographicState() {
   const [exportInpaintMethod, setExportInpaintMethod] = useState<ExportInpaintMethod>(
     (currentProject?.export_inpaint_method as ExportInpaintMethod) || 'hybrid'
   );
-  const [aspectRatio, setAspectRatio] = useState('16:9');
+  const [aspectRatio, setAspectRatio] = useState('auto');
   const [resolution, setResolution] = useState('2K');
   const [isSavingExportSettings, setIsSavingExportSettings] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -100,22 +100,43 @@ export function useInfographicState() {
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isSwitchingVersion, setIsSwitchingVersion] = useState(false);
 
-  const payloadMode = useMemo(() => {
+  const payload = useMemo(() => {
     if (!currentProject?.product_payload) return null;
     try {
-      const obj = JSON.parse(currentProject.product_payload);
-      const m = obj?.mode;
-      return m === 'series' ? ('series' as InfographicMode) : m === 'single' ? ('single' as InfographicMode) : null;
+      return JSON.parse(currentProject.product_payload);
     } catch {
       return null;
     }
   }, [currentProject?.product_payload]);
+
+  const payloadMode = useMemo(() => {
+    const m = payload?.mode;
+    return m === 'series' ? ('series' as InfographicMode) : m === 'single' ? ('single' as InfographicMode) : null;
+  }, [payload]);
+
+  const payloadAspectRatio = useMemo(() => {
+    const ratio = typeof payload?.aspect_ratio === 'string' ? payload.aspect_ratio.trim() : '';
+    return ratio;
+  }, [payload]);
 
   useEffect(() => {
     if (payloadMode) {
       setMode(payloadMode);
     }
   }, [payloadMode]);
+
+  useEffect(() => {
+    const allowed = new Set(['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9']);
+    if (!payloadAspectRatio || payloadAspectRatio === 'auto') {
+      setAspectRatio('auto');
+      return;
+    }
+    if (allowed.has(payloadAspectRatio)) {
+      setAspectRatio(payloadAspectRatio);
+      return;
+    }
+    setAspectRatio('auto');
+  }, [payloadAspectRatio]);
 
   const loadMaterials = useCallback(async () => {
     if (!projectId) return;
@@ -163,7 +184,6 @@ export function useInfographicState() {
       try {
         const response = await getSettings();
         if (response.data) {
-          setAspectRatio(response.data.image_aspect_ratio || '16:9');
           setResolution(response.data.image_resolution || '2K');
         }
       } catch (error) {
@@ -291,7 +311,7 @@ export function useInfographicState() {
       const response = await generateInfographic(projectId, {
         mode,
         useTemplate: useTemplateOption,
-        aspectRatio: aspectRatio.trim() || undefined,
+        aspectRatio: aspectRatio === 'auto' ? undefined : aspectRatio.trim() || undefined,
         resolution: resolution.trim() || undefined,
       });
       const taskId = response.data?.task_id;
@@ -404,7 +424,7 @@ export function useInfographicState() {
         templateUsageMode,
         descImageUrls: selectedDescImageUrls,
         uploadedFiles: editUploadedFiles,
-        aspectRatio,
+        aspectRatio: aspectRatio === 'auto' ? undefined : aspectRatio,
         resolution,
       });
       const taskId = response.data?.task_id;

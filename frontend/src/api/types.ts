@@ -83,7 +83,7 @@ export type TemplateVariantType = 'cover' | 'content' | 'transition' | 'ending';
 
 // ===== 小红书宽高比类型 =====
 
-export type XhsAspectRatio = '4:5' | '3:4' | '9:16';
+export type XhsAspectRatio = '4:5' | '3:4' | 'auto';
 
 // ===== 模板使用模式类型 =====
 

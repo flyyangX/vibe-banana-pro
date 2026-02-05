@@ -50,8 +50,12 @@ interface GenerationSettingsProps {
   setOutlinePageCount: (value: string) => void;
   infographicMode: 'single' | 'series';
   setInfographicMode: (mode: 'single' | 'series') => void;
-  xhsAspectRatio: '4:5' | '3:4';
-  setXhsAspectRatio: (ratio: '4:5' | '3:4') => void;
+  pptAspectRatio: '16:9' | '4:3' | 'auto';
+  setPptAspectRatio: (ratio: '16:9' | '4:3' | 'auto') => void;
+  infographicAspectRatio: string;
+  setInfographicAspectRatio: (ratio: string) => void;
+  xhsAspectRatio: '4:5' | '3:4' | 'auto';
+  setXhsAspectRatio: (ratio: '4:5' | '3:4' | 'auto') => void;
 }
 
 const GenerationSettings: React.FC<GenerationSettingsProps> = ({
@@ -60,9 +64,14 @@ const GenerationSettings: React.FC<GenerationSettingsProps> = ({
   setOutlinePageCount,
   infographicMode,
   setInfographicMode,
+  pptAspectRatio,
+  setPptAspectRatio,
+  infographicAspectRatio,
+  setInfographicAspectRatio,
   xhsAspectRatio,
   setXhsAspectRatio,
 }) => {
+  const infographicRatios = ['auto', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9'];
   return (
     <div className="mb-4 md:mb-6 rounded-lg border border-gray-200 bg-white p-3 md:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -112,6 +121,27 @@ const GenerationSettings: React.FC<GenerationSettingsProps> = ({
             </div>
           </div>
         )}
+        {(!currentProject.product_type || currentProject.product_type === 'ppt') && (
+          <div className="flex flex-col gap-1 text-xs text-gray-600">
+            PPT 比例
+            <div className="flex flex-wrap gap-2">
+              {(['16:9', '4:3', 'auto'] as const).map((ratio) => (
+                <button
+                  key={ratio}
+                  type="button"
+                  onClick={() => setPptAspectRatio(ratio)}
+                  className={`rounded-full border px-3 py-1 text-xs ${
+                    pptAspectRatio === ratio
+                      ? 'border-banana-500 text-banana-700 bg-banana-50'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {ratio === 'auto' ? '自动' : ratio}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {currentProject.product_type === 'xiaohongshu' && (
           <div className="flex flex-col gap-1 text-xs text-gray-600">
             竖图比例
@@ -138,7 +168,34 @@ const GenerationSettings: React.FC<GenerationSettingsProps> = ({
               >
                 3:4
               </button>
+              <button
+                type="button"
+                onClick={() => setXhsAspectRatio('auto')}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  xhsAspectRatio === 'auto'
+                    ? 'border-banana-500 text-banana-700 bg-banana-50'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                自动
+              </button>
             </div>
+          </div>
+        )}
+        {currentProject.product_type === 'infographic' && (
+          <div className="flex flex-col gap-1 text-xs text-gray-600">
+            信息图比例
+            <select
+              value={infographicAspectRatio}
+              onChange={(e) => setInfographicAspectRatio(e.target.value)}
+              className="h-9 rounded-md border border-gray-200 px-2 text-sm text-gray-900 focus:border-banana-400 focus:outline-none"
+            >
+              {infographicRatios.map((ratio) => (
+                <option key={ratio} value={ratio}>
+                  {ratio === 'auto' ? '自动' : ratio}
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </div>
@@ -155,8 +212,12 @@ interface OutlineListProps {
   setOutlinePageCount: (value: string) => void;
   infographicMode: 'single' | 'series';
   setInfographicMode: (mode: 'single' | 'series') => void;
-  xhsAspectRatio: '4:5' | '3:4';
-  setXhsAspectRatio: (ratio: '4:5' | '3:4') => void;
+  pptAspectRatio: '16:9' | '4:3' | 'auto';
+  setPptAspectRatio: (ratio: '16:9' | '4:3' | 'auto') => void;
+  infographicAspectRatio: string;
+  setInfographicAspectRatio: (ratio: string) => void;
+  xhsAspectRatio: '4:5' | '3:4' | 'auto';
+  setXhsAspectRatio: (ratio: '4:5' | '3:4' | 'auto') => void;
   sensors: SensorDescriptor<SensorOptions>[];
   onDragEnd: (event: DragEndEvent) => void;
   onPageSelect: (pageId: string | null) => void;
@@ -178,6 +239,10 @@ export const OutlineList: React.FC<OutlineListProps> = ({
   setOutlinePageCount,
   infographicMode,
   setInfographicMode,
+  pptAspectRatio,
+  setPptAspectRatio,
+  infographicAspectRatio,
+  setInfographicAspectRatio,
   xhsAspectRatio,
   setXhsAspectRatio,
   sensors,
@@ -201,6 +266,10 @@ export const OutlineList: React.FC<OutlineListProps> = ({
           setOutlinePageCount={setOutlinePageCount}
           infographicMode={infographicMode}
           setInfographicMode={setInfographicMode}
+          pptAspectRatio={pptAspectRatio}
+          setPptAspectRatio={setPptAspectRatio}
+          infographicAspectRatio={infographicAspectRatio}
+          setInfographicAspectRatio={setInfographicAspectRatio}
           xhsAspectRatio={xhsAspectRatio}
           setXhsAspectRatio={setXhsAspectRatio}
         />

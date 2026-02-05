@@ -63,6 +63,17 @@ class GenAITextProvider(TextProvider):
 
         self.model = model
     
+    def _build_config(self, thinking_budget: int = 0, response_mime_type: str | None = None):
+        """
+        Build GenerateContentConfig with optional thinking and response MIME.
+        """
+        config_params = {}
+        if thinking_budget > 0:
+            config_params['thinking_config'] = types.ThinkingConfig(thinking_budget=thinking_budget)
+        if response_mime_type:
+            config_params['response_mime_type'] = response_mime_type
+        return types.GenerateContentConfig(**config_params) if config_params else None
+    
     @retry(
         stop=stop_after_attempt(get_config().GENAI_MAX_RETRIES + 1),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -79,15 +90,21 @@ class GenAITextProvider(TextProvider):
         Returns:
             Generated text
         """
-        # 构建配置，只有在 thinking_budget > 0 时才启用推理模式
-        config_params = {}
-        if thinking_budget > 0:
-            config_params['thinking_config'] = types.ThinkingConfig(thinking_budget=thinking_budget)
-        
         response = self.client.models.generate_content(
             model=self.model,
             contents=prompt,
-            config=types.GenerateContentConfig(**config_params) if config_params else None,
+            config=self._build_config(thinking_budget=thinking_budget),
+        )
+        return response.text
+    
+    def generate_text_json(self, prompt: str, thinking_budget: int = 0) -> str:
+        """
+        Generate text with JSON response MIME type.
+        """
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=self._build_config(thinking_budget=thinking_budget, response_mime_type="application/json"),
         )
         return response.text
     
@@ -116,14 +133,28 @@ class GenAITextProvider(TextProvider):
         # 构建多模态内容
         contents = [img, prompt]
         
-        # 构建配置，只有在 thinking_budget > 0 时才启用推理模式
-        config_params = {}
-        if thinking_budget > 0:
-            config_params['thinking_config'] = types.ThinkingConfig(thinking_budget=thinking_budget)
-        
         response = self.client.models.generate_content(
             model=self.model,
             contents=contents,
-            config=types.GenerateContentConfig(**config_params) if config_params else None,
+            config=self._build_config(thinking_budget=thinking_budget),
+        )
+        return response.text
+    
+    def generate_text_json_with_images(self, prompt: str, images: list, thinking_budget: int = 0) -> str:
+        """
+        Generate text with images and JSON response MIME type.
+        """
+        from PIL import Image
+        contents = []
+        for img in images or []:
+            try:
+                contents.append(Image.open(img))
+            except Exception:
+                continue
+        contents.append(prompt)
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=contents,
+            config=self._build_config(thinking_budget=thinking_budget, response_mime_type="application/json"),
         )
         return response.text

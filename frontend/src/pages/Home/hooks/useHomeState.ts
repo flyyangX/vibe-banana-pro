@@ -17,8 +17,10 @@ import {
   updateMaterialMeta
 } from '@/api/endpoints';
 import { getTemplateFile } from '@/components/shared/TemplateSelector/index';
+import { detectCreationType } from '../utils/contentDetection';
 
 export type CreationType = 'idea' | 'outline' | 'description';
+export type CreationMode = 'auto' | CreationType;
 export type ProductType = 'ppt' | 'infographic' | 'xiaohongshu';
 
 export interface MaterialItem {
@@ -34,7 +36,7 @@ export const useHomeState = () => {
   const { show, ToastContainer } = useToast();
 
   // Tab and content state
-  const [activeTab, setActiveTab] = useState<CreationType>('idea');
+  const [creationMode, setCreationMode] = useState<CreationMode>('auto');
   const [content, setContent] = useState('');
   const [productType, setProductType] = useState<ProductType>('ppt');
 
@@ -588,7 +590,11 @@ export const useHomeState = () => {
 
       const styleDesc = templateStyle.trim() ? templateStyle.trim() : undefined;
 
-      await initializeProject(activeTab, content, templateFile || undefined, styleDesc, productType);
+      const resolvedType = creationMode === 'auto'
+        ? detectCreationType(content)
+        : creationMode;
+
+      await initializeProject(resolvedType, content, templateFile || undefined, styleDesc, productType);
 
       const projectId = localStorage.getItem('currentProjectId');
       if (!projectId) {
@@ -638,11 +644,9 @@ export const useHomeState = () => {
         console.log('No materials to attach');
       }
 
-      if (productType === 'infographic' || productType === 'xiaohongshu') {
+      if (resolvedType === 'idea' || resolvedType === 'outline') {
         navigate(`/project/${projectId}/outline`);
-      } else if (activeTab === 'idea' || activeTab === 'outline') {
-        navigate(`/project/${projectId}/outline`);
-      } else if (activeTab === 'description') {
+      } else if (resolvedType === 'description') {
         navigate(`/project/${projectId}/detail`);
       }
     } catch (error: any) {
@@ -662,8 +666,8 @@ export const useHomeState = () => {
     isGlobalLoading,
 
     // Tab and content
-    activeTab,
-    setActiveTab,
+    activeTab: creationMode,
+    setActiveTab: setCreationMode,
     content,
     setContent,
     productType,

@@ -276,7 +276,10 @@ class AIService:
         """
         # 调用AI生成文本（根据 enable_text_reasoning 配置调整 thinking_budget）
         actual_budget = self._get_text_thinking_budget()
-        response_text = self.text_provider.generate_text(prompt, thinking_budget=actual_budget)
+        if hasattr(self.text_provider, 'generate_text_json'):
+            response_text = self.text_provider.generate_text_json(prompt, thinking_budget=actual_budget)
+        else:
+            response_text = self.text_provider.generate_text(prompt, thinking_budget=actual_budget)
 
         cleaned_text = _extract_json_candidate(response_text)
         try:
@@ -308,7 +311,13 @@ class AIService:
         """
         # 调用AI生成文本（带图片），根据 enable_text_reasoning 配置调整 thinking_budget
         actual_budget = self._get_text_thinking_budget()
-        if hasattr(self.text_provider, 'generate_with_image'):
+        if hasattr(self.text_provider, 'generate_text_json_with_images'):
+            response_text = self.text_provider.generate_text_json_with_images(
+                prompt=prompt,
+                images=[image_path],
+                thinking_budget=actual_budget
+            )
+        elif hasattr(self.text_provider, 'generate_with_image'):
             response_text = self.text_provider.generate_with_image(
                 prompt=prompt,
                 image_path=image_path,
@@ -346,7 +355,16 @@ class AIService:
 
         if not image_paths:
             # Fallback to text-only
-            response_text = self.text_provider.generate_text(prompt, thinking_budget=actual_budget)
+            if hasattr(self.text_provider, 'generate_text_json'):
+                response_text = self.text_provider.generate_text_json(prompt, thinking_budget=actual_budget)
+            else:
+                response_text = self.text_provider.generate_text(prompt, thinking_budget=actual_budget)
+        elif hasattr(self.text_provider, 'generate_text_json_with_images'):
+            response_text = self.text_provider.generate_text_json_with_images(
+                prompt=prompt,
+                images=image_paths,
+                thinking_budget=actual_budget
+            )
         elif hasattr(self.text_provider, 'generate_text_with_images'):
             response_text = self.text_provider.generate_text_with_images(
                 prompt=prompt,

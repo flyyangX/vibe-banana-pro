@@ -363,7 +363,11 @@ def edit_material_image(project_id, material_id):
         if not edit_instruction:
             return bad_request("edit_instruction is required")
 
-        aspect_ratio = (data.get('aspect_ratio') or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')).strip()
+        aspect_ratio = data.get('aspect_ratio')
+        if not aspect_ratio or str(aspect_ratio).strip() == 'auto':
+            aspect_ratio = current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
+        else:
+            aspect_ratio = str(aspect_ratio).strip()
         resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
 
         # Determine template usage mode

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, FileText, ChevronRight, Trash2 } from 'lucide-react';
 import { Card } from '@/components/shared';
-import { getProjectTitle, getFirstPageImage, formatDate, getStatusText, getStatusColor } from '@/utils/projectUtils';
+import { getProjectTitle, getFirstPageImage, formatDate, getStatusText, getStatusColor, getProjectDisplayCount } from '@/utils/projectUtils';
 import type { Project } from '@/types';
 
 export interface ProjectCardProps {
@@ -52,7 +52,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   if (!projectId) return null;
 
   const title = getProjectTitle(project);
-  const pageCount = project.pages?.length || 0;
+  const { count: displayCount, unit } = getProjectDisplayCount(project);
   const statusText = getStatusText(project);
   const statusColor = getStatusColor(project);
   
@@ -112,7 +112,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <div className="flex items-center gap-3 md:gap-4 text-xs md:text-sm text-gray-500 flex-wrap">
             <span className="flex items-center gap-1">
               <FileText size={14} />
-              {pageCount} 页
+              {displayCount} {unit}
             </span>
             <span className="flex items-center gap-1">
               <Clock size={14} />

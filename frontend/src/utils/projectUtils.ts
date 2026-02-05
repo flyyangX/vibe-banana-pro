@@ -30,14 +30,34 @@ export const getProjectTitle = (project: Project): string => {
 };
 
 /**
- * 获取第一页图片URL
+ * 获取第一页图片URL（PPT 用 pages，信息图/小红书用 materials）
  */
 export const getFirstPageImage = (project: Project): string | null => {
+  const isInfographic = project.product_type === 'infographic';
+  const isXhs = project.product_type === 'xiaohongshu';
+
+  if (isInfographic || isXhs) {
+    const materials = (project as Project & { materials?: Array<{ url: string; updated_at?: string; created_at?: string }> }).materials;
+    if (materials?.length) {
+      const firstWithUrl = materials.find((m) => m.url);
+      if (firstWithUrl?.url) {
+        return getImageUrl(firstWithUrl.url, firstWithUrl.updated_at || firstWithUrl.created_at);
+      }
+    }
+    // XHS 可能仍主要依赖 pages 出图，materials 为空时回退到 pages
+    if (isXhs && project.pages?.length) {
+      const firstPageWithImage = project.pages.find(p => p.generated_image_url);
+      if (firstPageWithImage?.generated_image_url) {
+        return getImageUrl(firstPageWithImage.generated_image_url, firstPageWithImage.updated_at);
+      }
+    }
+    return null;
+  }
+
   if (!project.pages || project.pages.length === 0) {
     return null;
   }
 
-  // 找到第一页有图片的页面，优先使用 generated_image_url（已包含缩略图逻辑）
   const firstPageWithImage = project.pages.find(p => p.generated_image_url);
   if (firstPageWithImage?.generated_image_url) {
     return getImageUrl(firstPageWithImage.generated_image_url, firstPageWithImage.updated_at);
@@ -61,9 +81,27 @@ export const formatDate = (dateString: string): string => {
 };
 
 /**
- * 获取项目状态文本
+ * 获取项目状态文本（PPT 用 pages，信息图/小红书用 materials）
  */
 export const getStatusText = (project: Project): string => {
+  const isInfographic = project.product_type === 'infographic';
+  const isXhs = project.product_type === 'xiaohongshu';
+
+  if (isInfographic || isXhs) {
+    const materials = (project as Project & { materials?: Array<{ url?: string }> }).materials;
+    if (materials?.some((m) => m.url)) {
+      return '已完成';
+    }
+    if (isXhs) {
+      const hasImages = project.pages?.some(p => p.generated_image_path);
+      if (hasImages) return '已完成';
+      const hasDescriptions = project.pages?.some(p => p.description_content);
+      if (hasDescriptions) return '待生成图片';
+      if (project.pages?.length) return '待生成描述';
+    }
+    return '待生成描述';
+  }
+
   if (!project.pages || project.pages.length === 0) {
     return '未开始';
   }
@@ -76,6 +114,30 @@ export const getStatusText = (project: Project): string => {
     return '待生成图片';
   }
   return '待生成描述';
+};
+
+/**
+ * 获取项目展示数量（PPT 用页数，信息图/小红书用张数）
+ */
+export const getProjectDisplayCount = (project: Project): { count: number; unit: string } => {
+  const isInfographic = project.product_type === 'infographic';
+  const isXhs = project.product_type === 'xiaohongshu';
+
+  if (isInfographic || isXhs) {
+    const materials = (project as Project & { materials?: unknown[] }).materials;
+    const materialsCount = materials?.length ?? 0;
+    if (materialsCount > 0) {
+      return { count: materialsCount, unit: '张' };
+    }
+    if (isXhs) {
+      const pageCount = project.pages?.length ?? 0;
+      return { count: pageCount, unit: '张' };
+    }
+    return { count: 0, unit: '张' };
+  }
+
+  const count = project.pages?.length ?? 0;
+  return { count, unit: '页' };
 };
 
 /**

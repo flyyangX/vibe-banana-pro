@@ -53,7 +53,7 @@ export const InfographicPreview: React.FC = () => {
             ? getImageUrl(state.editTargetMaterial.url, state.editTargetMaterial.updated_at || state.editTargetMaterial.created_at)
             : null
         }
-        previewAspectRatio={state.aspectRatio}
+        previewAspectRatio={state.aspectRatio === 'auto' ? '16:9' : state.aspectRatio}
         showOutline
         outlineTitle={state.editOutlineTitle}
         outlinePointsText={state.editOutlinePoints}

@@ -304,7 +304,7 @@ export const XhsPreview: React.FC = () => {
         onClose={() => setIsEditModalOpen(false)}
         title={editIndex !== null ? `编辑第 ${editIndex + 1} 张` : '编辑卡片'}
         imageUrl={editImageUrl}
-        previewAspectRatio={aspectRatio}
+        previewAspectRatio={aspectRatio === 'auto' ? '3:4' : aspectRatio}
         showOutline
         outlineTitle={editOutlineTitle}
         outlinePointsText={editOutlinePoints}

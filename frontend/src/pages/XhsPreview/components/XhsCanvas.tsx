@@ -3,7 +3,7 @@ import { Copy, Download, RefreshCw, Maximize2, RotateCcw, Edit2 } from 'lucide-r
 import { Button, Loading, Skeleton } from '@/components/shared';
 import type { Material } from '@/api/endpoints';
 
-type XhsAspectRatio = '4:5' | '3:4' | '9:16';
+type XhsAspectRatio = '4:5' | '3:4' | 'auto';
 
 type MaterialWithNote = Material & {
   noteData?: {
@@ -66,11 +66,10 @@ export const XhsCanvas: React.FC<XhsCanvasProps> = ({
   formatElapsed,
 }) => {
   const aspectRatioClass = (() => {
-    switch (aspectRatio) {
+    const effectiveRatio = aspectRatio === 'auto' ? '3:4' : aspectRatio;
+    switch (effectiveRatio) {
       case '3:4':
         return 'aspect-[3/4]';
-      case '9:16':
-        return 'aspect-[9/16]';
       case '4:5':
       default:
         return 'aspect-[4/5]';
@@ -95,9 +94,9 @@ export const XhsCanvas: React.FC<XhsCanvasProps> = ({
                 onChange={(e) => onAspectRatioChange(e.target.value as XhsAspectRatio)}
                 className="px-2 py-1 border border-gray-200 rounded text-xs"
               >
-                <option value="4:5">4:5</option>
                 <option value="3:4">3:4</option>
-                <option value="9:16">9:16</option>
+                <option value="4:5">4:5</option>
+                <option value="auto">自动</option>
               </select>
             </div>
             <div className="text-xs text-gray-500">

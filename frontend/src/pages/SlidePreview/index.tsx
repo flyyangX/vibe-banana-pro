@@ -2,7 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getImageUrl } from '@/api/client';
 import { exportProject } from '@/api/endpoints';
-import { ImageVersionsModal, Loading } from '@/components/shared';
+import { Button, ImageVersionsModal, Loading, MaterialGeneratorModal, MaterialSelector, Modal, ProjectSettingsModal, TemplateSelector } from '@/components/shared';
 
 import { PreviewToolbar } from './components/PreviewToolbar';
 import { PreviewCanvas } from './components/PreviewCanvas';
@@ -30,6 +30,10 @@ export const SlidePreview: React.FC = () => {
     setIsProjectSettingsOpen,
     setIsMaterialModalOpen,
     setIsMaterialSelectorOpen,
+    isTemplateModalOpen,
+    isProjectSettingsOpen,
+    isMaterialModalOpen,
+    isMaterialSelectorOpen,
     editPrompt,
     setEditPrompt,
     editOutlineTitle,
@@ -67,6 +71,28 @@ export const SlidePreview: React.FC = () => {
     startBatchPreparing,
     templateUsageMode,
     hasTemplateResource,
+    selectedTemplateId,
+    selectedPresetTemplateId,
+    handleTemplateSelect,
+    handleClearTemplate,
+    isUploadingTemplate,
+    isClearingTemplate,
+    extraRequirements,
+    templateStyle,
+    handleExtraRequirementsChange,
+    handleTemplateStyleChange,
+    handleSaveExtraRequirements,
+    handleSaveTemplateStyle,
+    exportExtractorMethod,
+    exportInpaintMethod,
+    handleSaveExportSettings,
+    isSavingRequirements,
+    isSavingTemplateStyle,
+    isSavingExportSettings,
+    setTemplateUsageMode,
+    setExportExtractorMethod,
+    setExportInpaintMethod,
+    handleEditSelectMaterials,
     hasAllImages,
     formatElapsed,
     getElapsedSeconds,
@@ -270,7 +296,7 @@ export const SlidePreview: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <PreviewToolbar
         projectId={projectId}
         fromHistory={fromHistory}
@@ -363,20 +389,114 @@ export const SlidePreview: React.FC = () => {
         showToast={show}
       />
 
-          <ImageVersionsModal
-            isOpen={isVersionModalOpen}
-            onClose={() => setIsVersionModalOpen(false)}
-            title={`历史版本（第 ${selectedIndex + 1} 页）`}
-            isLoading={false}
-            isSwitching={false}
-            versions={imageVersions.map((v) => ({
-              versionId: v.version_id,
-              versionNumber: v.version_number,
-              isCurrent: v.is_current,
-              previewUrl: v.image_url ? getImageUrl(v.image_url, v.created_at) : null,
-            }))}
-            onSelectVersion={handleSwitchVersion}
+      <ImageVersionsModal
+        isOpen={isVersionModalOpen}
+        onClose={() => setIsVersionModalOpen(false)}
+        title={`历史版本（第 ${selectedIndex + 1} 页）`}
+        isLoading={false}
+        isSwitching={false}
+        versions={imageVersions.map((v) => ({
+          versionId: v.version_id,
+          versionNumber: v.version_number,
+          isCurrent: v.is_current,
+          previewUrl: v.image_url ? getImageUrl(v.image_url, v.created_at) : null,
+        }))}
+        onSelectVersion={handleSwitchVersion}
+      />
+
+      {projectId && (
+        <>
+          <ProjectSettingsModal
+            isOpen={isProjectSettingsOpen}
+            onClose={() => setIsProjectSettingsOpen(false)}
+            extraRequirements={extraRequirements}
+            templateStyle={templateStyle}
+            templateUsageMode={templateUsageMode}
+            onExtraRequirementsChange={handleExtraRequirementsChange}
+            onTemplateStyleChange={handleTemplateStyleChange}
+            onTemplateUsageModeChange={setTemplateUsageMode}
+            onSaveExtraRequirements={handleSaveExtraRequirements}
+            onSaveTemplateStyle={handleSaveTemplateStyle}
+            isSavingRequirements={isSavingRequirements}
+            isSavingTemplateStyle={isSavingTemplateStyle}
+            exportExtractorMethod={exportExtractorMethod}
+            exportInpaintMethod={exportInpaintMethod}
+            onExportExtractorMethodChange={setExportExtractorMethod}
+            onExportInpaintMethodChange={setExportInpaintMethod}
+            onSaveExportSettings={handleSaveExportSettings}
+            isSavingExportSettings={isSavingExportSettings}
           />
+
+          <Modal
+            isOpen={isTemplateModalOpen}
+            onClose={() => setIsTemplateModalOpen(false)}
+            title="更换模板"
+            size="lg"
+          >
+            <div className="flex flex-col max-h-[70vh]">
+              <div className="shrink-0">
+                <p className="text-sm text-gray-600 mb-4">
+                  选择模板将影响后续 PPT 页面生成的风格与结构（不影响已生成页面）。
+                </p>
+              </div>
+              <div className="flex-1 overflow-y-auto pr-1">
+                <TemplateSelector
+                  onSelect={handleTemplateSelect}
+                  selectedTemplateId={selectedTemplateId}
+                  selectedPresetTemplateId={selectedPresetTemplateId}
+                  showUpload={true}
+                  projectId={projectId}
+                  templateVariants={currentProject?.template_variants}
+                  templateVariantsHistory={currentProject?.template_variants_history}
+                  onTemplatesGenerated={async () => {
+                    await syncProject(projectId);
+                  }}
+                  productContext="ppt"
+                  showAllToggle
+                />
+              </div>
+              <div className="shrink-0 pt-4 border-t">
+                {(isUploadingTemplate || isClearingTemplate) && (
+                  <div className="text-center pb-3 text-sm text-gray-500">
+                    {isUploadingTemplate ? '正在更换模板...' : '正在取消模板...'}
+                  </div>
+                )}
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={handleClearTemplate}
+                    disabled={isUploadingTemplate || isClearingTemplate || !hasTemplateResource}
+                  >
+                    取消当前模板
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsTemplateModalOpen(false)}
+                    disabled={isUploadingTemplate || isClearingTemplate}
+                  >
+                    关闭
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Modal>
+
+          <MaterialGeneratorModal
+            projectId={projectId}
+            isOpen={isMaterialModalOpen}
+            onClose={() => setIsMaterialModalOpen(false)}
+          />
+
+          <MaterialSelector
+            projectId={projectId}
+            isOpen={isMaterialSelectorOpen}
+            onClose={() => setIsMaterialSelectorOpen(false)}
+            multiple
+            maxSelection={8}
+            onSelect={handleEditSelectMaterials}
+          />
+        </>
+      )}
 
       <ToastContainer />
       {ConfirmDialog}

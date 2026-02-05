@@ -113,6 +113,9 @@ class Project(db.Model):
         if include_pages:
             # pages 现在是列表，不需要 order_by（已在 relationship 中定义）
             data['pages'] = [page.to_dict() for page in self.pages]
+        # infographic/xhs 项目需要 materials 用于历史列表缩略图和状态展示
+        if self.product_type in ('infographic', 'xiaohongshu') and self.materials:
+            data['materials'] = [m.to_dict() for m in sorted(self.materials, key=lambda x: (x.created_at or datetime.min))]
         
         return data
     

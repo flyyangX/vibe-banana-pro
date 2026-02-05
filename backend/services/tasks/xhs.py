@@ -69,7 +69,9 @@ def generate_xhs_task(
                     total = 7
             if total < 1:
                 raise ValueError("XHS pages count must be greater than 0")
-            aspect_ratio = (aspect_ratio or "4:5").strip()
+            aspect_ratio = (aspect_ratio or "3:4").strip()
+            if aspect_ratio == "auto":
+                aspect_ratio = "3:4"
             resolution = (resolution or "2K").strip()
             try:
                 max_workers = int(max_workers or 6)

@@ -39,7 +39,9 @@ export const useOutlineEditorState = () => {
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [outlinePageCount, setOutlinePageCount] = useState<string>('');
   const [infographicMode, setInfographicMode] = useState<'single' | 'series'>('single');
-  const [xhsAspectRatio, setXhsAspectRatio] = useState<'4:5' | '3:4'>('4:5');
+  const [pptAspectRatio, setPptAspectRatio] = useState<'16:9' | '4:3' | 'auto'>('16:9');
+  const [infographicAspectRatio, setInfographicAspectRatio] = useState<string>('auto');
+  const [xhsAspectRatio, setXhsAspectRatio] = useState<'4:5' | '3:4' | 'auto'>('3:4');
   const { confirm, ConfirmDialog } = useConfirm();
   const { show, ToastContainer } = useToast();
 
@@ -76,9 +78,39 @@ export const useOutlineEditorState = () => {
         : typeof payload.image_count === 'number'
           ? payload.image_count
           : null;
+    const payloadAspectRatio = typeof payload.aspect_ratio === 'string' ? payload.aspect_ratio.trim() : '';
     setOutlinePageCount(payloadPageCount ? String(payloadPageCount) : '');
     setInfographicMode(payload.mode === 'series' ? 'series' : 'single');
-    setXhsAspectRatio(payload.aspect_ratio === '3:4' ? '3:4' : '4:5');
+    if (currentProject?.product_type === 'xiaohongshu') {
+      if (payloadAspectRatio === 'auto') {
+        setXhsAspectRatio('auto');
+      } else if (payloadAspectRatio === '4:5') {
+        setXhsAspectRatio('4:5');
+      } else {
+        setXhsAspectRatio('3:4');
+      }
+    }
+    if (!currentProject?.product_type || currentProject.product_type === 'ppt') {
+      if (payloadAspectRatio === 'auto') {
+        setPptAspectRatio('auto');
+      } else if (payloadAspectRatio === '4:3') {
+        setPptAspectRatio('4:3');
+      } else {
+        setPptAspectRatio('16:9');
+      }
+    }
+    if (currentProject?.product_type === 'infographic') {
+      const infoRatios = new Set([
+        '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9',
+      ]);
+      if (payloadAspectRatio === 'auto' || !payloadAspectRatio) {
+        setInfographicAspectRatio('auto');
+      } else if (infoRatios.has(payloadAspectRatio)) {
+        setInfographicAspectRatio(payloadAspectRatio);
+      } else {
+        setInfographicAspectRatio('auto');
+      }
+    }
   }, [currentProject?.id, currentProject?.product_payload]);
 
   useEffect(() => {
@@ -126,15 +158,31 @@ export const useOutlineEditorState = () => {
       if (currentProject.product_type === 'infographic') {
         payload.product_type = 'infographic';
         payload.mode = infographicMode;
+        if (infographicAspectRatio === 'auto') {
+          delete payload.aspect_ratio;
+        } else {
+          payload.aspect_ratio = infographicAspectRatio;
+        }
       }
       if (currentProject.product_type === 'xiaohongshu') {
         payload.product_type = 'xiaohongshu';
         payload.mode = payload.mode || 'vertical_carousel';
-        payload.aspect_ratio = xhsAspectRatio;
+        if (xhsAspectRatio === 'auto') {
+          delete payload.aspect_ratio;
+        } else {
+          payload.aspect_ratio = xhsAspectRatio;
+        }
         if (desiredPageCount) {
           payload.image_count = desiredPageCount;
         } else {
           delete payload.image_count;
+        }
+      }
+      if (!currentProject.product_type || currentProject.product_type === 'ppt') {
+        if (pptAspectRatio === 'auto') {
+          delete payload.aspect_ratio;
+        } else {
+          payload.aspect_ratio = pptAspectRatio;
         }
       }
       if (desiredPageCount) {
@@ -172,7 +220,18 @@ export const useOutlineEditorState = () => {
     } catch (error) {
       console.error('生成大纲失败:', error);
     }
-  }, [currentProject, outlinePageCount, infographicMode, xhsAspectRatio, projectId, syncProject, confirm, generateOutline]);
+  }, [
+    currentProject,
+    outlinePageCount,
+    infographicMode,
+    xhsAspectRatio,
+    pptAspectRatio,
+    infographicAspectRatio,
+    projectId,
+    syncProject,
+    confirm,
+    generateOutline,
+  ]);
 
   const handleAiRefineOutline = useCallback(async (requirement: string, previousRequirements: string[]) => {
     if (!currentProject || !projectId) return;
@@ -241,6 +300,10 @@ export const useOutlineEditorState = () => {
     setOutlinePageCount,
     infographicMode,
     setInfographicMode,
+    pptAspectRatio,
+    setPptAspectRatio,
+    infographicAspectRatio,
+    setInfographicAspectRatio,
     xhsAspectRatio,
     setXhsAspectRatio,
     isGlobalLoading,

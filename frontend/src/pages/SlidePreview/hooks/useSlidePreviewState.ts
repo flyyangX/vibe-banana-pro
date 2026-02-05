@@ -2,8 +2,18 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useExportTasksStore } from '@/store/useExportTasksStore';
-import { useToast, useConfirm } from '@/components/shared';
-import { getPageImageVersions, setCurrentImageVersion, updateProject, listUserTemplates, type UserTemplate } from '@/api/endpoints';
+import { getTemplateFile, useToast, useConfirm } from '@/components/shared';
+import {
+  deleteTemplate,
+  getPageImageVersions,
+  listUserTemplates,
+  setCurrentImageVersion,
+  updateProject,
+  uploadTemplate,
+  type Material,
+  type UserTemplate,
+} from '@/api/endpoints';
+import { materialUrlToFile } from '@/components/shared/MaterialSelector/index';
 import type { ImageVersion, DescriptionContent, ExportExtractorMethod, ExportInpaintMethod } from '@/types';
 
 export interface EditContextByPage {
@@ -128,6 +138,97 @@ export function useSlidePreviewState() {
     const hasVariants = Object.values(variants).some(Boolean);
     return Boolean(currentProject?.template_image_path) || hasVariants;
   }, [currentProject?.template_image_path, currentProject?.template_variants]);
+
+  const handleExtraRequirementsChange = useCallback((value: string) => {
+    isEditingRequirements.current = true;
+    setExtraRequirements(value);
+  }, []);
+
+  const handleTemplateStyleChange = useCallback((value: string) => {
+    isEditingTemplateStyle.current = true;
+    setTemplateStyle(value);
+  }, []);
+
+  const handleTemplateSelect = useCallback(
+    async (templateFile: File | null, templateId?: string) => {
+      if (!projectId) return;
+      let file = templateFile;
+      if (templateId && !file) {
+        file = await getTemplateFile(templateId, userTemplates);
+        if (!file) {
+          show({ message: '加载模板失败', type: 'error' });
+          return;
+        }
+      }
+      if (!file) return;
+      setIsUploadingTemplate(true);
+      try {
+        await uploadTemplate(projectId, file, templateId);
+        await syncProject(projectId);
+        setIsTemplateModalOpen(false);
+        show({ message: '模板更换成功', type: 'success' });
+        if (templateId) {
+          if (templateId.length <= 3 && /^\d+$/.test(templateId)) {
+            setSelectedPresetTemplateId(templateId);
+            setSelectedTemplateId(null);
+          } else {
+            setSelectedTemplateId(templateId);
+            setSelectedPresetTemplateId(null);
+          }
+        }
+      } catch (error: any) {
+        show({ message: `更换模板失败: ${error.message || '未知错误'}`, type: 'error' });
+      } finally {
+        setIsUploadingTemplate(false);
+      }
+    },
+    [projectId, userTemplates, syncProject, show]
+  );
+
+  const handleClearTemplate = useCallback(async () => {
+    if (!projectId) return;
+    if (!hasTemplateResource) {
+      show({ message: '当前项目没有模板可清除', type: 'info' });
+      return;
+    }
+    const confirmed = await confirm({
+      title: '取消模板',
+      message: '确定取消当前选中的模板吗？取消后将使用无模板模式生成（不影响已生成页面）。',
+      confirmText: '取消模板',
+      cancelText: '保留模板',
+    });
+    if (!confirmed) return;
+
+    setIsClearingTemplate(true);
+    try {
+      await deleteTemplate(projectId);
+      await syncProject(projectId);
+      setSelectedTemplateId(null);
+      setSelectedPresetTemplateId(null);
+      show({ message: '已取消当前模板，可使用无模板模式生成', type: 'success' });
+    } catch (error: any) {
+      show({ message: `清除失败: ${error.message || '未知错误'}`, type: 'error' });
+    } finally {
+      setIsClearingTemplate(false);
+    }
+  }, [projectId, hasTemplateResource, confirm, syncProject, show]);
+
+  const handleEditSelectMaterials = useCallback(
+    async (materials: Material[]) => {
+      if (!materials || materials.length === 0) return;
+      try {
+        const files = await Promise.all(materials.map((m) => materialUrlToFile(m)));
+        setSelectedContextImages((prev) => ({
+          ...prev,
+          uploadedFiles: [...(prev.uploadedFiles || []), ...files],
+        }));
+        show({ message: `已添加 ${materials.length} 个素材`, type: 'success' });
+      } catch (error: any) {
+        show({ message: error.message || '加载素材失败', type: 'error' });
+      }
+    },
+    [show]
+  );
 
   const pagesWithImages = useMemo(() => {
     return currentProject?.pages.filter(p => p.id && p.generated_image_path) || [];
@@ -608,6 +709,11 @@ export function useSlidePreviewState() {
     handleSaveExtraRequirements,
     handleSaveTemplateStyle,
     handleSaveExportSettings,
+    handleExtraRequirementsChange,
+    handleTemplateStyleChange,
+    handleTemplateSelect,
+    handleClearTemplate,
+    handleEditSelectMaterials,
     extractImageUrlsFromDescription,
 
     // Toast & Confirm

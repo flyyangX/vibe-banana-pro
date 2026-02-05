@@ -577,6 +577,19 @@ def generate_images(project_id):
         # 从配置中读取默认并发数，如果请求中提供了则使用请求的值
         max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 8))
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
+        default_ratio = current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
+        aspect_ratio = data.get('aspect_ratio')
+        if aspect_ratio is None:
+            try:
+                payload = json.loads(project.product_payload) if project.product_payload else {}
+            except Exception:
+                payload = {}
+            payload_ratio = (payload.get('aspect_ratio') or '').strip() if isinstance(payload, dict) else ''
+            if payload_ratio and payload_ratio != 'auto':
+                aspect_ratio = payload_ratio
+        aspect_ratio = (str(aspect_ratio).strip() if aspect_ratio else default_ratio)
+        if aspect_ratio not in ['16:9', '4:3']:
+            aspect_ratio = default_ratio
         
         # Create task
         task = Task(
@@ -653,7 +666,7 @@ def generate_images(project_id):
             outline,
             use_template,
             max_workers,
-            current_app.config['DEFAULT_ASPECT_RATIO'],
+            aspect_ratio,
             current_app.config['DEFAULT_RESOLUTION'],
             app,
             combined_requirements if combined_requirements.strip() else None,
@@ -712,7 +725,11 @@ def generate_infographic(project_id):
         outline = ProjectService.reconstruct_outline_from_pages(pages) if pages else []
 
         # Defaults
-        aspect_ratio = data.get('aspect_ratio') or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
+        aspect_ratio = data.get('aspect_ratio')
+        if not aspect_ratio or str(aspect_ratio).strip() == 'auto':
+            aspect_ratio = current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
+        else:
+            aspect_ratio = str(aspect_ratio).strip()
         resolution = data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')
         max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 6))
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
@@ -817,9 +834,11 @@ def generate_xhs(project_id):
         if image_count < 1:
             return bad_request("image_count must be greater than 0")
 
-        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
-        if aspect_ratio not in ['4:5', '3:4', '9:16']:
-            return bad_request("aspect_ratio must be one of 4:5, 3:4, 9:16")
+        aspect_ratio = (data.get('aspect_ratio') or '3:4').strip()
+        if aspect_ratio == 'auto':
+            aspect_ratio = '3:4'
+        if aspect_ratio not in ['4:5', '3:4']:
+            return bad_request("aspect_ratio must be one of 4:5, 3:4")
 
         resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
         max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 6))
@@ -926,9 +945,11 @@ def generate_xhs_card(project_id):
             use_template = True
         elif template_usage_mode == 'style':
             use_template = False
-        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
-        if aspect_ratio not in ['4:5', '3:4', '9:16']:
-            return bad_request("aspect_ratio must be one of 4:5, 3:4, 9:16")
+        aspect_ratio = (data.get('aspect_ratio') or '3:4').strip()
+        if aspect_ratio == 'auto':
+            aspect_ratio = '3:4'
+        if aspect_ratio not in ['4:5', '3:4']:
+            return bad_request("aspect_ratio must be one of 4:5, 3:4")
 
         resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
 
@@ -1022,9 +1043,11 @@ def edit_xhs_card(project_id):
         if index < 0 or index >= len(pages):
             return bad_request("index out of range")
 
-        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
-        if aspect_ratio not in ['4:5', '3:4', '9:16']:
-            return bad_request("aspect_ratio must be one of 4:5, 3:4, 9:16")
+        aspect_ratio = (data.get('aspect_ratio') or '3:4').strip()
+        if aspect_ratio == 'auto':
+            aspect_ratio = '3:4'
+        if aspect_ratio not in ['4:5', '3:4']:
+            return bad_request("aspect_ratio must be one of 4:5, 3:4")
         resolution = (data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).strip()
 
         template_usage_mode = (data.get('template_usage_mode') or '').strip()
@@ -1287,7 +1310,9 @@ def generate_xhs_blueprint(project_id):
 
         data = request.get_json() or {}
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
-        aspect_ratio = (data.get('aspect_ratio') or '4:5').strip()
+        aspect_ratio = (data.get('aspect_ratio') or '3:4').strip()
+        if aspect_ratio == 'auto':
+            aspect_ratio = '3:4'
         copywriting_only = bool(data.get('copywriting_only', False))
 
         pages = Page.query.filter_by(project_id=project_id).order_by(Page.order_index).all()

@@ -1,4 +1,4 @@
-import type { MaterialWithNote, XhsPayload } from './types';
+import type { XhsPayload } from './types';
 
 export const normalizeFilesUrl = (url?: string | null) => {
   if (!url) return '';
@@ -26,11 +26,10 @@ export const parsePayload = (raw?: string | null): XhsPayload | null => {
 };
 
 export const getAspectRatioClass = (aspectRatio: string): string => {
-  switch (aspectRatio) {
+  const effectiveRatio = aspectRatio === 'auto' ? '3:4' : aspectRatio;
+  switch (effectiveRatio) {
     case '3:4':
       return 'aspect-[3/4]';
-    case '9:16':
-      return 'aspect-[9/16]';
     case '4:5':
     default:
       return 'aspect-[4/5]';
