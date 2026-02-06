@@ -296,7 +296,7 @@ export const SlidePreview: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       <PreviewToolbar
         projectId={projectId}
         fromHistory={fromHistory}

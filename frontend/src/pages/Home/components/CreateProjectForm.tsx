@@ -1,7 +1,13 @@
-import React from 'react';
-import { Sparkles, FileText, FileEdit, Lightbulb, Wand2 } from 'lucide-react';
-import { Button, Textarea } from '@/components/shared';
+import React, { useState } from 'react';
+import { ArrowRight, Sparkles, FileText, FileEdit, Wand2, Paperclip, Palette, X } from 'lucide-react';
+import { Button } from '@/components/shared';
+import { VisualProductSelector } from './VisualProductSelector';
 import type { CreationMode, ProductType } from '../hooks/useHomeState';
+import { FileUploadZone } from './FileUploadZone';
+import { MaterialPreviewList, ReferenceFileList } from '@/components/shared';
+import { Textarea } from '@/components/shared';
+import { TemplateSelector } from '@/components/shared/TemplateSelector/index';
+import { PRESET_STYLES } from '@/config/presetStyles';
 
 interface ModeConfig {
   label: string;
@@ -19,61 +25,77 @@ const PRODUCT_COPY: Record<ProductType, { short: string; full: string; unit: str
 const getModeConfig = (productType: ProductType): Record<CreationMode, ModeConfig> => {
   const { full, unit } = PRODUCT_COPY[productType];
 
-  const ideaExample =
-    productType === 'ppt'
-      ? '例如：生成一份关于 AI 发展史的演讲 PPT'
-      : productType === 'infographic'
-        ? '例如：生成一张关于 AI 发展史的信息图'
-        : '例如：生成一篇关于 AI 发展史的小红书图文';
-
-  const outlineIntro =
-    productType === 'ppt'
-      ? '粘贴你的 PPT 大纲...'
-      : productType === 'infographic'
-        ? '粘贴你的信息图结构大纲...'
-        : '粘贴你的小红书图文大纲...';
-
-  const scriptIntro =
-    productType === 'ppt'
-      ? '粘贴你的逐页脚本...'
-      : productType === 'infographic'
-        ? '粘贴你的信息图分区脚本...'
-        : '粘贴你的小红书图文分卡脚本...';
-
-  const scriptExample =
-    productType === 'ppt'
-      ? `例如：\n第 1 页\n标题：人工智能的诞生\n内容：1950 年，图灵提出"图灵测试"...\n\n第 2 页\n标题：AI 的发展历程\n内容：1950年代：符号主义...\n...`
-      : productType === 'infographic'
-        ? `例如：\n第 1 ${unit}\n标题：人工智能的诞生\n内容：1950 年，图灵提出"图灵测试"...\n\n第 2 ${unit}\n标题：AI 的发展历程\n内容：1950年代：符号主义...\n...`
-        : `例如：\n第 1 ${unit}\n标题：封面\n内容：AI 发展史速览（副标题/金句）\n\n第 2 ${unit}\n标题：起源\n内容：1950 年，图灵提出"图灵测试"...\n...`;
-
   return {
     auto: {
-      label: '自动识别',
-      icon: <Wand2 size={16} />,
-      placeholder: `粘贴主题 / 大纲 / 分${unit}脚本，系统会自动识别类型并进入下一步`,
-      description: `自动识别输入类型：主题 / 大纲 / 分${unit}脚本（适配 ${full}）`,
+      label: '智能识别',
+      icon: <Wand2 size={13} />,
+      placeholder: `粘贴你的想法、大纲或脚本...`,
+      description: `自动识别输入`,
     },
     idea: {
-      label: '主题生成',
-      icon: <Sparkles size={16} />,
-      placeholder: ideaExample,
-      description: `输入你的想法，AI 将为你生成 ${full} 的大纲与内容`,
+      label: '一句话生成',
+      icon: <Sparkles size={13} />,
+      placeholder: `输入你的演讲主题或核心想法...`,
+      description: `创意生成`,
     },
     outline: {
-      label: '大纲生成',
-      icon: <FileText size={16} />,
-      placeholder: `${outlineIntro}\n\n例如：\n第一部分：AI 的起源\n- 1950 年代的开端\n- 达特茅斯会议\n\n第二部分：发展历程\n...`,
-      description: `已有大纲？直接粘贴即可，AI 会自动结构化并进入下一步（${full}）`,
+      label: '已有大纲',
+      icon: <FileText size={13} />,
+      placeholder: `1. 封面：...\n2. 目录：...\n3. 第一章：...`,
+      description: `大纲转${full}`,
     },
     description: {
-      label: '逐页脚本',
-      icon: <FileEdit size={16} />,
-      placeholder: `${scriptIntro}\n\n${scriptExample}`,
-      description: `已有分${unit}脚本？AI 将解析为大纲与页面内容，进入详情编辑（${full}）`,
+      label: '已有脚本',
+      icon: <FileEdit size={13} />,
+      placeholder: `Page 1:\n[画面]...\n[台词]...`,
+      description: `脚本转${full}`,
     },
   };
 };
+
+// Define types for the props passed from Home
+// Define types for the props passed from Home
+interface FileProps {
+    isDocDragOver: boolean;
+    setIsDocDragOver: (v: boolean) => void;
+    handleDocDrop: (e: React.DragEvent) => void;
+    handleDocInputSelect: () => void;
+    isUploadingDoc: boolean;
+    docUploadProgress: number;
+    isImageDragOver: boolean;
+    setIsImageDragOver: (v: boolean) => void;
+    handleImageDrop: (e: React.DragEvent) => void;
+    handleImageSelect: () => void;
+    onOpenMaterialSelector: () => void;
+    isUploadingImage: boolean;
+    imageUploadProgress: number;
+    isUploadExpanded: boolean;
+    setIsUploadExpanded: (v: boolean) => void;
+    isXhs: boolean;
+    docInputRef: React.RefObject<HTMLInputElement>;
+    imageInputRef: React.RefObject<HTMLInputElement>;
+    docAccept: string;
+    imageAccept: string;
+    handleDocInputSelectChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    materialItems: any[];
+    handleRemoveMaterial: (id: string) => void;
+    referenceFiles: any[];
+    setPreviewFileId: (id: string | null) => void;
+    handleFileRemove: (id: string) => void;
+    handleFileStatusChange: (id: string, status: any) => void;
+}
+
+interface StyleProps {
+    useTemplateStyle: boolean;
+    handleUseTemplateStyleChange: (checked: boolean) => void;
+    templateStyle: string;
+    setTemplateStyle: (val: any) => void; 
+    handleTemplateSelect: (template: any) => void;
+    selectedTemplateId: string | undefined;
+    selectedPresetTemplateId: string | undefined;
+    currentProjectId: string | null;
+}
 
 interface CreateProjectFormProps {
   activeTab: CreationMode;
@@ -87,6 +109,8 @@ interface CreateProjectFormProps {
   isLoading: boolean;
   isParsingFiles: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  fileProps: FileProps;
+  styleProps: StyleProps;
 }
 
 export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
@@ -101,110 +125,219 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
   isLoading,
   isParsingFiles,
   textareaRef,
+  fileProps,
+  styleProps
 }) => {
   const MODE_CONFIG = getModeConfig(productType);
-  const currentConfig = MODE_CONFIG[activeTab];
-  const textareaRows = activeTab === 'idea' ? 4 : 8;
+  const selectedConfig = MODE_CONFIG[activeTab];
+  
+  // Local state for toolbar panels
+  const [activePanel, setActivePanel] = useState<'none' | 'files' | 'style'>('none');
+
+  const togglePanel = (panel: 'files' | 'style') => {
+      setActivePanel(current => current === panel ? 'none' : panel);
+  };
+  
+  // Minimal mode selector
+  const ModeSelector = () => (
+    <div className="flex gap-6">
+       {(Object.keys(MODE_CONFIG) as CreationMode[]).map((mode) => {
+          const config = MODE_CONFIG[mode];
+          const isActive = activeTab === mode;
+          return (
+            <button
+              key={mode}
+              onClick={() => setActiveTab(mode)}
+              className={`
+                text-[13px] font-medium flex items-center gap-1.5 transition-colors
+                ${isActive ? 'text-black' : 'text-gray-400 hover:text-gray-600'}
+              `}
+            >
+              {config.icon}
+              {config.label}
+            </button>
+          );
+       })}
+    </div>
+  );
 
   return (
-    <>
-      {/* 顶部控制栏：模式选择 + 产物类型 */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-        {/* 模式选择 - 分段控制器风格 */}
-        <div className="flex p-1 bg-gray-100/80 rounded-lg overflow-x-auto max-w-full no-scrollbar">
-          {(Object.keys(MODE_CONFIG) as CreationMode[]).map((mode) => {
-            const config = MODE_CONFIG[mode];
-            const isActive = activeTab === mode;
-            return (
-              <button
-                key={mode}
-                onClick={() => setActiveTab(mode)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'bg-white text-banana-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
-                }`}
-              >
-                {config.icon}
-                <span>{config.label}</span>
-              </button>
-            );
-          })}
-        </div>
+    <div className="w-full flex flex-col">
+      {/* Product Selection */}
+      <VisualProductSelector 
+          value={productType}
+          onChange={setProductType}
+          disabled={isLoading || isParsingFiles}
+      />
 
-        {/* 产物类型选择 - 简化版 */}
-        <div className="flex items-center gap-2 p-1 bg-gray-100/80 rounded-lg">
-          <button
-            type="button"
-            onClick={() => setProductType('ppt')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              productType === 'ppt'
-                ? 'bg-white text-banana-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            PPT
-          </button>
-          <button
-            type="button"
-            onClick={() => setProductType('infographic')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              productType === 'infographic'
-                ? 'bg-white text-banana-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            信息图
-          </button>
-          <button
-            type="button"
-            onClick={() => setProductType('xiaohongshu')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              productType === 'xiaohongshu'
-                ? 'bg-white text-banana-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            小红书
-          </button>
-        </div>
+      {/* Input Mode Tabs */}
+      <div className="mb-6">
+         <ModeSelector />
       </div>
 
-      {/* 描述提示 */}
-      <div className="relative mb-3">
-        <p className="text-sm text-gray-500 flex items-center gap-2">
-          <Lightbulb size={14} className="text-banana-500 flex-shrink-0" />
-          <span>{currentConfig.description}</span>
-        </p>
-      </div>
-
-      {/* 输入区 - 带按钮 */}
-      <div className="relative mb-2 group">
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-banana-400 to-orange-400 rounded-lg opacity-0 group-hover:opacity-20 blur transition-opacity duration-300"></div>
-        <Textarea
+      {/* Clean Input Area */}
+      <div className="relative group w-full mb-4">
+        <textarea
           ref={textareaRef}
-          placeholder={currentConfig.placeholder}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onPaste={onPaste}
-          rows={textareaRows}
-          className="relative pr-20 md:pr-28 pb-12 md:pb-14 text-sm md:text-base border-2 border-gray-200 focus:border-banana-400 transition-colors duration-200 min-h-[160px]"
+          placeholder={selectedConfig.placeholder}
+          className="w-full bg-transparent p-0 min-h-[160px] md:min-h-[200px] resize-none outline-none text-xl md:text-2xl font-serif text-black placeholder-gray-200 leading-relaxed"
         />
-
-        {/* 右下角：开始生成按钮 */}
-        <div className="absolute right-2 md:right-3 bottom-2 md:bottom-3 z-10">
-          <Button
-            size="sm"
-            onClick={onSubmit}
-            loading={isLoading}
-            disabled={!content.trim() || isParsingFiles}
-            className="shadow-sm text-xs md:text-sm px-3 md:px-4"
-          >
-            {isParsingFiles ? '解析中...' : '下一步'}
-          </Button>
-        </div>
       </div>
-    </>
+      
+      {/* Integrated Toolbar & Actions */}
+      <div className="flex flex-col gap-4">
+          
+          {/* Toolbar Buttons */}
+          <div className="flex justify-between items-center border-t border-gray-100 pt-4">
+             <div className="flex items-center gap-4">
+                <button 
+                   onClick={() => togglePanel('files')}
+                   className={`flex items-center gap-2 text-sm font-medium transition-colors ${activePanel === 'files' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Paperclip size={16} />
+                    <span>{fileProps.referenceFiles.length + fileProps.materialItems.length > 0 ? `附件 (${fileProps.referenceFiles.length + fileProps.materialItems.length})` : '添加附件'}</span>
+                </button>
+                <button 
+                   onClick={() => togglePanel('style')}
+                   className={`flex items-center gap-2 text-sm font-medium transition-colors ${activePanel === 'style' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Palette size={16} />
+                    <span>视觉风格</span>
+                </button>
+             </div>
+
+             <Button
+                onClick={onSubmit}
+                loading={isLoading}
+                disabled={!content.trim() || isParsingFiles}
+                className={`
+                    bg-black text-white hover:bg-gray-900 rounded-none px-6 py-2.5 h-auto 
+                    text-sm font-medium transition-all duration-300
+                    disabled:opacity-30 disabled:cursor-not-allowed
+                    flex items-center gap-2
+                    ${content.trim() ? 'opacity-100' : 'opacity-50'}
+                `}
+                >
+                {isParsingFiles ? '解析中...' : '开始生成'}
+                <ArrowRight size={16} />
+            </Button>
+          </div>
+
+          {/* Expandable Panels */}
+          {activePanel === 'files' && (
+              <div className="bg-gray-50 rounded-lg p-6 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">参考资料 & 附件</h3>
+                      <button onClick={() => setActivePanel('none')}><X size={14} className="text-gray-400 hover:text-black" /></button>
+                  </div>
+                  <FileUploadZone
+                      isDocDragOver={fileProps.isDocDragOver}
+                      setIsDocDragOver={fileProps.setIsDocDragOver}
+                      onDocDrop={fileProps.handleDocDrop}
+                      onDocInputSelect={fileProps.handleDocInputSelect}
+                      isUploadingDoc={fileProps.isUploadingDoc}
+                      docUploadProgress={fileProps.docUploadProgress}
+                      isImageDragOver={fileProps.isImageDragOver}
+                      setIsImageDragOver={fileProps.setIsImageDragOver}
+                      onImageDrop={fileProps.handleImageDrop}
+                      onImageSelect={fileProps.handleImageSelect}
+                      onOpenMaterialSelector={fileProps.onOpenMaterialSelector}
+                      isUploadingImage={fileProps.isUploadingImage}
+                      imageUploadProgress={fileProps.imageUploadProgress}
+                      isUploadExpanded={fileProps.isUploadExpanded}
+                      setIsUploadExpanded={fileProps.setIsUploadExpanded}
+                      isXhs={fileProps.isXhs}
+                      docInputRef={fileProps.docInputRef}
+                      imageInputRef={fileProps.imageInputRef}
+                      docAccept={fileProps.docAccept}
+                      imageAccept={fileProps.imageAccept}
+                      onDocInputChange={fileProps.handleDocInputSelectChange}
+                      onImageInputChange={fileProps.handleFileSelect}
+                   />
+                   {(fileProps.referenceFiles.length > 0 || fileProps.materialItems.length > 0) && (
+                       <div className="mt-4 space-y-4">
+                           <MaterialPreviewList
+                              materials={fileProps.materialItems}
+                              onRemoveMaterial={fileProps.handleRemoveMaterial}
+                              title="已选素材"
+                            />
+                            <ReferenceFileList
+                              files={fileProps.referenceFiles}
+                              onFileClick={fileProps.setPreviewFileId}
+                              onFileDelete={fileProps.handleFileRemove}
+                              onFileStatusChange={fileProps.handleFileStatusChange}
+                              deleteMode="remove"
+                              title="已选文档"
+                            />
+                       </div>
+                   )}
+              </div>
+          )}
+
+          {activePanel === 'style' && (
+              <div className="bg-gray-50 rounded-lg p-6 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
+                   <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">视觉风格</h3>
+                      <button onClick={() => setActivePanel('none')}><X size={14} className="text-gray-400 hover:text-black" /></button>
+                  </div>
+                  <div className="space-y-4">
+                        <label className="flex items-center gap-2 cursor-pointer group w-fit">
+                           <input
+                             type="checkbox"
+                             checked={styleProps.useTemplateStyle}
+                             onChange={(e) => styleProps.handleUseTemplateStyleChange(e.target.checked)}
+                             className="accent-black w-3.5 h-3.5" 
+                           />
+                           <span className="text-sm text-gray-600 group-hover:text-black transition-colors">
+                             使用自定义描述
+                           </span>
+                        </label>
+
+                        {styleProps.useTemplateStyle ? (
+                          <div className="space-y-3">
+                            <Textarea
+                              placeholder="例如：极简风格，衬线字体，高对比度..."
+                              value={styleProps.templateStyle}
+                              onChange={(e) => styleProps.setTemplateStyle(e.target.value)}
+                              rows={2}
+                              className="text-sm border border-gray-200 focus:border-black p-3 w-full bg-white rounded-md resize-none font-serif"
+                            />
+                             <div className="flex flex-wrap gap-2">
+                                {PRESET_STYLES.map((preset) => (
+                                  <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => styleProps.setTemplateStyle((prev: string) => prev === preset.description ? '' : preset.description)}
+                                    className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider transition-colors border rounded-sm ${
+                                      styleProps.templateStyle === preset.description
+                                        ? 'border-black bg-black text-white'
+                                        : 'border-gray-200 bg-white text-gray-400 hover:border-gray-400 hover:text-black'
+                                    }`}
+                                  >
+                                    {preset.name}
+                                  </button>
+                                ))}
+                              </div>
+                          </div>
+                        ) : (
+                           <div className="bg-white rounded-lg p-2 border border-gray-200">
+                              <TemplateSelector
+                                onSelect={styleProps.handleTemplateSelect}
+                                selectedTemplateId={styleProps.selectedTemplateId}
+                                selectedPresetTemplateId={styleProps.selectedPresetTemplateId}
+                                showUpload={true}
+                                projectId={styleProps.currentProjectId}
+                              />
+                           </div>
+                        )}
+                     </div>
+              </div>
+          )}
+      </div>
+    </div>
   );
 };
 

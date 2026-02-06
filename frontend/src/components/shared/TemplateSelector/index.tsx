@@ -63,15 +63,16 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
     <>
       <div className="space-y-4">
         {showAllToggle && (
-          <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            <span>显示全部模板（包含不匹配当前产品的模板）</span>
+          <div className="flex items-center justify-between text-xs text-secondary bg-gray-50 border border-border px-4 py-2">
+            <span className="font-medium">显示全部模板（包含不匹配当前产品的模板）</span>
             <label className="inline-flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={showAllTemplates}
                 onChange={(e) => setShowAllTemplates(e.target.checked)}
+                className="accent-black"
               />
-              <span>{showAllTemplates ? '已开启' : '已关闭'}</span>
+              <span className="text-primary font-bold">{showAllTemplates ? '已开启' : '已关闭'}</span>
             </label>
           </div>
         )}

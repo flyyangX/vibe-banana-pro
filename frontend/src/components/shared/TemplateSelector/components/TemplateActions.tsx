@@ -34,41 +34,46 @@ export const VariantGenerator: React.FC<VariantGeneratorProps> = ({
   onOpenVariantModal,
 }) => {
   return (
-    <div className="border-t pt-4">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">生成模板套装</h4>
-      <p className="text-xs text-gray-500 mb-3">
+    <div className="border-t border-border pt-6">
+      <h4 className="text-sm font-bold text-primary mb-2">生成模板套装 (Generate Variants)</h4>
+      <p className="text-xs text-secondary mb-4 opacity-70">
         选择要生成的模板类型。生成会覆盖已存在的同类型模板。
       </p>
-      <div className="flex flex-wrap gap-3 mb-3 text-sm">
+      <div className="flex flex-wrap gap-4 mb-4 text-sm">
         {VARIANT_TYPES.map((item) => (
-          <label key={item.key} className="flex items-center gap-2">
+          <label key={item.key} className="flex items-center gap-2 cursor-pointer group">
             <input
               type="checkbox"
               checked={selectedVariantTypes.includes(item.key)}
               onChange={() => onToggleVariantType(item.key)}
+              className="w-4 h-4 border-gray-300 text-black focus:ring-black accent-black"
             />
-            {item.label}
+            <span className={`transition-colors ${selectedVariantTypes.includes(item.key) ? 'text-primary font-bold' : 'text-secondary group-hover:text-primary'}`}>
+              {item.label}
+            </span>
           </label>
         ))}
       </div>
       <Textarea
-        label="套装额外提示词（可选）"
+        label="套装额外提示词 (Optional)"
         placeholder="例如：整体更简洁、留白更多、装饰更少..."
         value={variantsExtraPrompt}
         onChange={(e) => onVariantsExtraPromptChange(e.target.value)}
         rows={3}
+        className="rounded-none border-border focus:border-black resize-none mb-3"
       />
       <Button
-        variant="secondary"
+        variant="outline"
         size="sm"
         onClick={onGenerateVariants}
         disabled={isGeneratingVariants}
+        className="rounded-none border-black hover:bg-black hover:text-white w-full sm:w-auto"
       >
         {isGeneratingVariants ? `生成中... (${formatElapsed(variantGenerateElapsed)})` : '生成模板套装'}
       </Button>
 
-      <div className="mt-4">
-        <h5 className="text-xs text-gray-500 mb-2">模板预览</h5>
+      <div className="mt-6">
+        <h5 className="text-xs font-bold text-secondary mb-3 uppercase tracking-wide">模板预览 (Preview)</h5>
         <div className="grid grid-cols-4 gap-3">
           {VARIANT_TYPES.map((item) => {
             const url = templateVariants?.[item.key];
@@ -77,7 +82,7 @@ export const VariantGenerator: React.FC<VariantGeneratorProps> = ({
                 type="button"
                 key={item.key}
                 onClick={() => onOpenVariantModal(item.key)}
-                className="aspect-[4/3] rounded border border-gray-200 bg-gray-50 relative overflow-hidden text-left"
+                className="aspect-[4/3] border border-border bg-gray-50 relative overflow-hidden text-left hover:border-black transition-colors group"
               >
                 {url ? (
                   <img
@@ -86,11 +91,11 @@ export const VariantGenerator: React.FC<VariantGeneratorProps> = ({
                     className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400">
-                    未生成
+                  <div className="absolute inset-0 flex items-center justify-center text-xs text-secondary opacity-50 font-serif italic">
+                    Not Generated
                   </div>
                 )}
-                <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-xs px-2 py-1">
+                <div className="absolute bottom-0 left-0 right-0 bg-black text-white text-[10px] px-2 py-1 uppercase tracking-wider font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                   {item.label}
                 </div>
               </button>
@@ -167,11 +172,11 @@ export const VariantModal: React.FC<VariantModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="模板单图"
+      title="模板单图编辑"
       size="lg"
     >
-      <div className="space-y-4">
-        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+      <div className="space-y-6">
+        <div className="aspect-video bg-gray-100 border border-border overflow-hidden flex items-center justify-center">
           {previewVariantType && currentVariantUrl ? (
             <img
               src={getImageUrl(currentVariantUrl)}
@@ -179,14 +184,14 @@ export const VariantModal: React.FC<VariantModalProps> = ({
               className="w-full h-full object-contain"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-sm text-gray-400">
+            <div className="text-sm text-secondary font-serif italic opacity-50">
               暂无模板图
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-700">上传自定义图片替换</div>
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="text-sm font-bold text-primary">上传自定义图片替换</div>
           <label className="inline-flex">
             <input
               type="file"
@@ -195,19 +200,19 @@ export const VariantModal: React.FC<VariantModalProps> = ({
               className="hidden"
               disabled={isVariantUploading}
             />
-            <span className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer">
-              {isVariantUploading ? '上传中...' : '上传替换'}
+            <span className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-colors cursor-pointer">
+              {isVariantUploading ? 'Uploading...' : 'Upload & Replace'}
             </span>
           </label>
         </div>
 
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-gray-700">历史版本</div>
-            <div className="text-xs text-gray-500">点击切换</div>
+            <div className="text-sm font-bold text-primary">历史版本 (History)</div>
+            <div className="text-xs text-secondary italic">点击切换版本</div>
           </div>
           {variantHistoryList.length > 0 ? (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {variantHistoryList.map((url, idx) => {
                 const isActive = !!currentVariantUrl && url === currentVariantUrl;
                 return (
@@ -216,8 +221,8 @@ export const VariantModal: React.FC<VariantModalProps> = ({
                     type="button"
                     onClick={() => onSelectVariantHistory(url)}
                     disabled={isVariantSelecting}
-                    className={`aspect-[4/3] rounded border overflow-hidden relative ${
-                      isActive ? 'border-banana-500 ring-2 ring-banana-200' : 'border-gray-200'
+                    className={`aspect-[4/3] border overflow-hidden relative transition-all ${
+                      isActive ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-black'
                     }`}
                   >
                     <img
@@ -226,8 +231,8 @@ export const VariantModal: React.FC<VariantModalProps> = ({
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                     {isActive && (
-                      <div className="absolute inset-0 bg-banana-500/20 flex items-center justify-center text-xs text-white">
-                        当前
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-[10px] uppercase font-bold text-white tracking-wider">
+                        Current
                       </div>
                     )}
                   </button>
@@ -235,26 +240,28 @@ export const VariantModal: React.FC<VariantModalProps> = ({
               })}
             </div>
           ) : (
-            <div className="text-xs text-gray-500">暂无历史版本</div>
+            <div className="text-xs text-secondary opacity-50 bg-gray-50 p-2 border border-border border-dashed text-center">暂无历史版本</div>
           )}
         </div>
 
         <Textarea
-          label="单图额外提示词（可选）"
+          label="单图额外提示词 (Optional)"
           placeholder="例如：更简洁、留白更多、装饰元素更少..."
           value={variantExtraPrompt}
           onChange={(e) => onVariantExtraPromptChange(e.target.value)}
           rows={3}
+          className="rounded-none border-border focus:border-black resize-none"
         />
 
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
+        <div className="bg-white border border-border p-4 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-gray-700">参考图（可选）</div>
+            <div className="text-sm font-bold text-primary">参考图 (References)</div>
             <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onOpenMaterialSelector}
+                className="text-xs rounded-none hover:bg-gray-100"
               >
                 从素材库选择
               </Button>
@@ -266,8 +273,8 @@ export const VariantModal: React.FC<VariantModalProps> = ({
                   className="hidden"
                   onChange={handleVariantAddFiles}
                 />
-                <span className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer">
-                  上传参考图
+                <span className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold border border-black bg-white hover:bg-black hover:text-white transition-colors cursor-pointer uppercase tracking-wider">
+                  Add Images
                 </span>
               </label>
             </div>
@@ -276,40 +283,42 @@ export const VariantModal: React.FC<VariantModalProps> = ({
           {(variantRefImageUrls.length > 0 || variantUploadedFiles.length > 0) ? (
             <div className="space-y-2">
               {variantRefImageUrls.map((u, idx) => (
-                <div key={`${u}-${idx}`} className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded-lg px-3 py-2">
-                  <div className="truncate pr-2">{u}</div>
+                <div key={`${u}-${idx}`} className="flex items-center justify-between text-xs bg-gray-50 border border-border px-3 py-2">
+                  <div className="truncate pr-2 font-mono">{u}</div>
                   <button
-                    className="text-gray-500 hover:text-red-600"
+                    className="text-secondary hover:text-red-600 font-bold uppercase text-[10px]"
                     onClick={() => onRemoveVariantUrl(idx)}
                     type="button"
                   >
-                    删除
+                    Delete
                   </button>
                 </div>
               ))}
               {variantUploadedFiles.map((f, idx) => (
-                <div key={`${f.name}-${idx}`} className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded-lg px-3 py-2">
-                  <div className="truncate pr-2">{f.name}</div>
+                <div key={`${f.name}-${idx}`} className="flex items-center justify-between text-xs bg-gray-50 border border-border px-3 py-2">
+                  <div className="truncate pr-2 font-mono">{f.name}</div>
                   <button
-                    className="text-gray-500 hover:text-red-600"
+                    className="text-secondary hover:text-red-600 font-bold uppercase text-[10px]"
                     onClick={() => onRemoveVariantFile(idx)}
                     type="button"
                   >
-                    删除
+                    Delete
                   </button>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-xs text-gray-500">不选择也可以直接重新生成</div>
+            <div className="text-xs text-secondary opacity-50 italic">
+              AI 可以参考这些图片生成新的设计
+            </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={onClose}>
+        <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <Button variant="ghost" onClick={onClose} className="rounded-none hover:bg-gray-100">
             取消
           </Button>
-          <Button variant="primary" onClick={onRegenerate} disabled={isVariantRegenerating}>
+          <Button variant="primary" onClick={onRegenerate} disabled={isVariantRegenerating} className="bg-black text-white rounded-none hover:bg-gray-800 px-6">
             {isVariantRegenerating ? `生成中... (${formatElapsed(variantRegenerateElapsed)})` : 'AI 重新生成'}
           </Button>
         </div>

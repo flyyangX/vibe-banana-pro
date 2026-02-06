@@ -35,7 +35,7 @@ export const History: React.FC = () => {
   } = useHistoryState();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-banana-50 via-white to-gray-50">
+    <div className="min-h-screen bg-white">
       <HistoryNavbar onGoHome={navigateHome} />
       <main className="max-w-6xl mx-auto px-3 md:px-4 py-6 md:py-8">
         <HistoryHeader

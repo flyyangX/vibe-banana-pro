@@ -35,16 +35,16 @@ export const TemplateUploader: React.FC<TemplateUploaderProps> = ({
     <>
       {/* Show save to library option on preview page */}
       {!showUpload && (
-        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="mt-3 p-3 bg-gray-50 border border-border">
+          <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={saveToLibrary}
               onChange={(e) => onSaveToLibraryChange(e.target.checked)}
-              className="w-4 h-4 text-banana-500 border-gray-300 rounded focus:ring-banana-500"
+              className="w-4 h-4 text-black border-gray-300 focus:ring-black accent-black"
             />
-            <span className="text-sm text-gray-700">
-              上传模板时同时保存到我的模板库
+            <span className="text-sm text-secondary">
+              同时保存到素材库 (Save to Library)
             </span>
           </label>
         </div>
@@ -63,13 +63,13 @@ export const TemplateUploader: React.FC<TemplateUploaderProps> = ({
       {/* Select from material library */}
       {hasProjectId && (
         <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">从素材库选择</h4>
+          <h4 className="text-sm font-bold text-primary mb-2">从素材库选择</h4>
           <Button
-            variant="secondary"
+            variant="outline"
             size="sm"
             icon={<ImagePlus size={16} />}
             onClick={onMaterialSelectorOpen}
-            className="w-full"
+            className="w-full rounded-none border-border hover:border-black hover:bg-black hover:text-white transition-all text-secondary"
           >
             从素材库选择作为模板
           </Button>

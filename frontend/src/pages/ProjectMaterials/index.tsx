@@ -62,7 +62,7 @@ export const ProjectMaterials: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       <HeaderBar
         title={currentProjectTitle}
         scope={scope}

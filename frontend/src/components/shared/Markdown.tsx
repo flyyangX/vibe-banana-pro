@@ -7,9 +7,11 @@ import rehypeRaw from 'rehype-raw';
 interface MarkdownProps {
   children: string;
   className?: string;
+  onImageClick?: (src: string) => void;
+  imageClassName?: string;
 }
 
-export const Markdown: React.FC<MarkdownProps> = ({ children, className = '' }) => {
+export const Markdown: React.FC<MarkdownProps> = ({ children, className = '', onImageClick, imageClassName = 'max-w-full h-auto rounded-lg my-2' }) => {
   return (
     <div className={`markdown-content ${className}`}>
       <ReactMarkdown
@@ -30,8 +32,9 @@ export const Markdown: React.FC<MarkdownProps> = ({ children, className = '' }) 
           <img 
             src={src} 
             alt={alt || ''} 
-            className="max-w-full h-auto rounded-lg my-2"
+            className={`${imageClassName} ${onImageClick ? 'cursor-zoom-in hover:opacity-90 transition-opacity' : ''}`}
             loading="lazy"
+            onClick={() => onImageClick && src && onImageClick(src)}
           />
         ),
         h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,

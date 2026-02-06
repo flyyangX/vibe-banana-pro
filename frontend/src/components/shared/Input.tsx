@@ -21,10 +21,10 @@ export const Input: React.FC<InputProps> = ({
       )}
       <input
         className={cn(
-          'w-full h-10 px-4 rounded-lg border border-gray-200 bg-white',
-          'focus:outline-none focus:ring-2 focus:ring-banana-500 focus:border-transparent',
-          'placeholder:text-gray-400 transition-all',
-          error && 'border-red-500 focus:ring-red-500',
+          'w-full h-10 px-4 border border-gray-200 bg-white rounded-none',
+          'focus:outline-none focus:border-black focus:ring-1 focus:ring-black',
+          'placeholder:text-gray-400 transition-all font-mono text-sm',
+          error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
           className
         )}
         {...props}

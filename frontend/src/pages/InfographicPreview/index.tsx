@@ -14,7 +14,7 @@ export const InfographicPreview: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       <InfographicToolbar
         projectId={state.projectId}
         projectTitle={state.currentProject?.idea_prompt}

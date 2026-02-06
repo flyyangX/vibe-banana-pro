@@ -11,7 +11,7 @@ import {
   FileText,
   Loader2,
 } from 'lucide-react';
-import { Button, ExportTasksPanel } from '@/components/shared';
+import { Button, ExportTasksPanel, Logo } from '@/components/shared';
 import type { ExportTask } from '@/store/useExportTasksStore';
 import type { Page } from '@/types';
 
@@ -61,86 +61,79 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   );
 
   return (
-    <header className="h-14 md:h-16 bg-white shadow-sm border-b border-gray-200 flex items-center justify-between px-3 md:px-6 flex-shrink-0">
+    <header className="h-14 md:h-16 bg-white border-b border-border flex items-center justify-between px-3 md:px-6 flex-shrink-0 z-10">
       <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Home size={16} className="md:w-[18px] md:h-[18px]" />}
-          onClick={() => navigate('/')}
-          className="hidden sm:inline-flex flex-shrink-0"
-        >
-          <span className="hidden md:inline">主页</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<ArrowLeft size={16} className="md:w-[18px] md:h-[18px]" />}
-          onClick={() => {
-            if (fromHistory) {
-              navigate('/history');
-            } else {
-              navigate(`/project/${projectId}/detail`);
-            }
-          }}
-          className="flex-shrink-0"
-        >
-          <span className="hidden sm:inline">返回</span>
-        </Button>
-        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-          <span className="text-xl md:text-2xl">🍌</span>
-          <span className="text-base md:text-xl font-bold truncate">蕉幻</span>
+        {/* 1. Logo First */}
+        <div className="flex items-center gap-2 min-w-0 cursor-pointer" onClick={() => navigate('/')}>
+          <Logo size="md" />
         </div>
-        <span className="text-gray-400 hidden md:inline">|</span>
-        <span className="text-sm md:text-lg font-semibold truncate hidden sm:inline">预览</span>
+
+        {/* 2. Functional Navigation */}
+        <div className="flex items-center gap-1 md:gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Home size={16} />}
+              onClick={() => navigate('/')}
+              className="flex-shrink-0 hover:bg-gray-100 w-10 h-10 p-0 rounded-full"
+              title="主页"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<ArrowLeft size={18} />}
+              onClick={() => {
+                if (fromHistory) {
+                  navigate('/history');
+                } else {
+                  navigate(`/project/${projectId}/detail`);
+                }
+              }}
+              className="flex-shrink-0 hover:bg-gray-100 w-10 h-10 p-0 rounded-full"
+              title="返回"
+            />
+        </div>
+
+        <div className="h-6 w-px bg-gray-200 hidden md:block"></div>
+        <span className="text-sm font-sans text-secondary hidden sm:inline pl-2 font-bold uppercase tracking-wider">预览</span>
       </div>
       <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
         <Button
           variant="ghost"
           size="sm"
-          icon={<Settings size={16} className="md:w-[18px] md:h-[18px]" />}
+          icon={<Settings size={16} />}
           onClick={onOpenProjectSettings}
-          className="hidden lg:inline-flex"
+          className="hidden lg:inline-flex text-secondary hover:text-primary"
         >
-          <span className="hidden xl:inline">项目设置</span>
+          <span className="hidden xl:inline ml-1">设置</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          icon={<Upload size={16} className="md:w-[18px] md:h-[18px]" />}
+          icon={<Upload size={16} />}
           onClick={onOpenTemplateModal}
-          className="hidden lg:inline-flex"
+          className="hidden lg:inline-flex text-secondary hover:text-primary"
         >
-          <span className="hidden xl:inline">更换模板</span>
+          <span className="hidden xl:inline ml-1">模板</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          icon={<ImagePlus size={16} className="md:w-[18px] md:h-[18px]" />}
+          icon={<ImagePlus size={16} />}
           onClick={onOpenMaterialModal}
-          className="hidden lg:inline-flex"
+          className="hidden lg:inline-flex text-secondary hover:text-primary"
         >
-          <span className="hidden xl:inline">素材生成</span>
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<ArrowLeft size={16} className="md:w-[18px] md:h-[18px]" />}
-          onClick={() => navigate(`/project/${projectId}/detail`)}
-          className="hidden sm:inline-flex"
-        >
-          <span className="hidden md:inline">上一步</span>
+          <span className="hidden xl:inline ml-1">素材</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          icon={<RefreshCw size={16} className={`md:w-[18px] md:h-[18px] ${isRefreshing ? 'animate-spin' : ''}`} />}
+          icon={<RefreshCw size={16} className={`${isRefreshing ? 'animate-spin' : ''}`} />}
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="hidden md:inline-flex"
-        >
-          <span className="hidden lg:inline">刷新</span>
-        </Button>
+          className="hidden md:inline-flex w-9 h-9 p-0 rounded-none border border-transparent hover:border-border"
+          title="刷新"
+        />
 
         {/* 导出任务按钮 */}
         {projectExportTasks.length > 0 && (
@@ -149,10 +142,10 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
               variant="ghost"
               size="sm"
               onClick={onToggleExportTasksPanel}
-              className="relative"
+              className="relative rounded-none h-9 border border-transparent hover:border-border"
             >
               {processingTasks.length > 0 ? (
-                <Loader2 size={16} className="animate-spin text-banana-500" />
+                <Loader2 size={16} className="animate-spin text-primary" />
               ) : (
                 <FileText size={16} />
               )}
@@ -165,7 +158,7 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                 <ExportTasksPanel
                   projectId={projectId}
                   pages={pages}
-                  className="w-96 max-h-[28rem] shadow-lg"
+                  className="w-96 max-h-[28rem] shadow-xl border border-border"
                 />
               </div>
             )}
@@ -176,10 +169,10 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
           <Button
             variant="primary"
             size="sm"
-            icon={<Download size={16} className="md:w-[18px] md:h-[18px]" />}
+            icon={<Download size={14} />}
             onClick={onToggleExportMenu}
             disabled={isMultiSelectMode ? selectedExportableCount === 0 : !hasAllImages}
-            className="text-xs md:text-sm"
+            className="text-xs md:text-sm rounded-none h-9 bg-primary text-white hover:bg-black"
           >
             <span className="hidden sm:inline">
               {isMultiSelectMode && selectedExportableCount > 0
@@ -193,29 +186,30 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
             </span>
           </Button>
           {showExportMenu && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
+            <div className="absolute right-0 mt-2 w-56 bg-white shadow-xl border border-border py-2 z-10 animate-in fade-in zoom-in-95 duration-200">
               {isMultiSelectMode && selectedExportableCount > 0 && (
-                <div className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
-                  将导出选中的 {selectedExportableCount} 页（仅已生成图片的页面）
+                <div className="px-4 py-2 text-xs text-secondary border-b border-border bg-gray-50 mb-1">
+                  导出选中 {selectedExportableCount} 页
                 </div>
               )}
               <button
                 onClick={() => onExport('pptx')}
-                className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors text-sm"
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors text-sm text-primary"
               >
-                导出为 PPTX
+                导出 PPTX
               </button>
               <button
                 onClick={() => onExport('editable-pptx')}
-                className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors text-sm"
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors text-sm text-primary flex items-center justify-between"
               >
-                导出可编辑 PPTX（Beta）
+                <span>导出可编辑 PPTX</span>
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded">Beta</span>
               </button>
               <button
                 onClick={() => onExport('pdf')}
-                className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors text-sm"
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors text-sm text-primary"
               >
-                导出为 PDF
+                导出 PDF
               </button>
             </div>
           )}

@@ -2,7 +2,7 @@
 
 <img width="256" src="https://github.com/user-attachments/assets/6f9e4cf9-912d-4faa-9d37-54fb676f547e">
 
-*Vibe your slides like vibing code.*
+_Vibe your slides like vibing code._
 
 **中文**
 
@@ -17,17 +17,16 @@
 [![GitHub issues](https://img.shields.io/github/issues-raw/flyyangX/vibe-banana-pro)](https://github.com/flyyangX/vibe-banana-pro/issues)
 [![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/flyyangX/vibe-banana-pro)](https://github.com/flyyangX/vibe-banana-pro/pulls)
 
+</p>
 
-</p> 
-
-<b>vibe-banana-pro：一个基于 nano banana🍌 的“多风格”AI PPT 生成应用。<br></b>
+<b>ViveVision：一个基于 nano banana🍌 的“多风格”AI PPT 生成应用。<br></b>
 <b>支持无模板生成（自动选风格并保持一致）、模板/风格描述混合控制、素材增强与自然语言迭代。</b>
 
 <b>🎯 降低PPT制作门槛，让每个人都能快速创作出美观专业的演示文稿</b>
 
 <br>
 
-*如果该项目对你有用, 欢迎 star🌟 & fork🍴*
+_如果该项目对你有用, 欢迎 star🌟 & fork🍴_
 
 <br>
 
@@ -36,6 +35,7 @@
 </div>
 
 ## 📌 派生说明 / Attribution
+
 本项目为二次开发版，基于开源项目 [`Anionex/banana-slides`](https://github.com/Anionex/banana-slides) 演进而来。
 
 - **上游项目**：提供了完整的 AI PPT 生成基础能力（解析/生成/导出/编辑等）。
@@ -43,19 +43,20 @@
 - **许可证与署名**：请遵循仓库内 `LICENSE` 的条款（包括署名、使用限制、再分发要求等）。
 
 ## ✨ 我的心得（这次改造为什么这样做）
+
 - **模板选择是摩擦点**：很多用户并不想先“挑模板”，而是希望先把内容跑通；所以更合理的默认是“能生成”，模板作为增强项。
 - **风格一致性必须落在项目级**：只在单页 prompt 里写“保持一致”不够稳定；更可靠的是生成一次 `template_style` 并写入项目，后续复用。
 - **交互反馈比算法更能提升体验**：无模板模式下生成前置步骤更重（例如生成风格/提示词），如果没有即时反馈，用户会反复点按钮导致重复任务。
 - **“风格包”是可持续方向**：小红书风格、本地化社媒风、信息卡片风、极简学术风……都可以抽象为可复用的风格描述模板 + 少量参数。
 
-
 ## ✨ 项目缘起
+
 你是否也曾陷入这样的困境：明天就要汇报，但PPT还是一片空白；脑中有无数精彩的想法，却被繁琐的排版和设计消磨掉所有热情？
 
 我(们)渴望能快速创作出既专业又具设计感的演示文稿，传统的AI PPT生成app，虽然大体满足“快”这一需求，却还存在以下问题：
 
 - 1️⃣只能选择预设模版，无法灵活调整风格
-- 2️⃣自由度低，多轮改动难以进行 
+- 2️⃣自由度低，多轮改动难以进行
 - 3️⃣成品观感相似，同质化严重
 - 4️⃣素材质量较低，缺乏针对性
 - 5️⃣图文排版割裂，设计感差
@@ -72,36 +73,35 @@
 4. **学生**：快速完成作业Pre，把精力专注于内容而非排版美化
 5. **职场人士**：商业提案、产品介绍快速可视化，多场景快速适配
 
-
 ## 🎨 结果案例
-
 
 <div align="center">
 
-| | |
-|:---:|:---:|
+|                                                                                                                     |                                                                                                                     |
+| :-----------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------: |
 | <img src="https://github.com/user-attachments/assets/d58ce3f7-bcec-451d-a3b9-ca3c16223644" width="500" alt="案例3"> | <img src="https://github.com/user-attachments/assets/c64cd952-2cdf-4a92-8c34-0322cbf3de4e" width="500" alt="案例2"> |
-| **软件开发最佳实践** | **DeepSeek-V3.2技术展示** |
+|                                                **软件开发最佳实践**                                                 |                                              **DeepSeek-V3.2技术展示**                                              |
 | <img src="https://github.com/user-attachments/assets/383eb011-a167-4343-99eb-e1d0568830c7" width="500" alt="案例4"> | <img src="https://github.com/user-attachments/assets/1a63afc9-ad05-4755-8480-fc4aa64987f1" width="500" alt="案例1"> |
-| **预制菜智能产线装备研发和产业化** | **钱的演变：从贝壳到纸币的旅程** |
+|                                         **预制菜智能产线装备研发和产业化**                                          |                                          **钱的演变：从贝壳到纸币的旅程**                                           |
 
 </div>
 
 更多案例可在上游项目中查看：<a href="https://github.com/Anionex/banana-slides/issues/2" > 使用案例（上游） </a>
 
-
 ## 🎯 功能介绍
 
 ### 1. 灵活多样的创作路径
+
 支持**想法**、**大纲**、**页面描述**三种起步方式，满足不同创作习惯。
+
 - **一句话生成**：输入一个主题，AI 自动生成结构清晰的大纲和逐页内容描述。
 - **自然语言编辑**：支持以 Vibe 形式口头修改大纲或描述（如"把第三页改成案例分析"），AI 实时响应调整。
 - **大纲/描述模式**：既可一键批量生成，也可手动调整细节。
 
 <img width="2000" height="1125" alt="image" src="https://github.com/user-attachments/assets/7fc1ecc6-433d-4157-b4ca-95fcebac66ba" />
 
-
 ### 2. 强大的素材解析能力
+
 - **多格式支持**：上传 PDF/Docx/MD/Txt 等文件，后台自动解析内容。
 - **智能提取**：自动识别文本中的关键点、图片链接和图表信息，为生成提供丰富素材。
 - **风格参考**：支持上传参考图片或模板，定制 PPT 风格。
@@ -109,14 +109,16 @@
 <img width="1920" height="1080" alt="文件解析与素材处理" src="https://github.com/user-attachments/assets/8cda1fd2-2369-4028-b310-ea6604183936" />
 
 ### 3. "Vibe" 式自然语言修改
+
 不再受限于复杂的菜单按钮，直接通过**自然语言**下达修改指令。
+
 - **局部重绘**：对不满意的区域进行口头式修改（如"把这个图换成饼图"）。
 - **整页优化**：基于 nano banana pro🍌 生成高清、风格统一的页面。
 
 <img width="2000" height="1125" alt="image" src="https://github.com/user-attachments/assets/929ba24a-996c-4f6d-9ec6-818be6b08ea3" />
 
-
 ### 4. 开箱即用的格式导出
+
 - **多格式支持**：一键导出标准 **PPTX** 或 **PDF** 文件。
 - **完美适配**：默认 16:9 比例，排版无需二次调整，直接演示。
 
@@ -124,16 +126,17 @@
 <img width="1748" height="538" alt="PPT与PDF导出" src="https://github.com/user-attachments/assets/647eb9b1-d0b6-42cb-a898-378ebe06c984" />
 
 ### 5. 可自由编辑的pptx导出（Beta迭代中）
+
 - **导出图像为高还原度、背景干净的、可自由编辑图像和文字的PPT页面**
 - 相关更新见（上游）：https://github.com/Anionex/banana-slides/issues/121
-<img width="1000"  alt="image" src="https://github.com/user-attachments/assets/a85d2d48-1966-4800-a4bf-73d17f914062" />
+  <img width="1000"  alt="image" src="https://github.com/user-attachments/assets/a85d2d48-1966-4800-a4bf-73d17f914062" />
 
 <br>
 
 **🌟和notebooklm slide deck功能对比**
-| 功能 | notebooklm | 本项目 | 
+| 功能 | notebooklm | 本项目 |
 | --- | --- | --- |
-| 页数上限 | 15页 | **无限制** | 
+| 页数上限 | 15页 | **无限制** |
 | 二次编辑 | 不支持 | **框选编辑+口头编辑** |
 | 素材添加 | 生成后无法添加 | **生成后自由添加** |
 | 导出格式 | 仅支持导出为 PDF | **导出为PDF、(可编辑)pptx** |
@@ -141,52 +144,51 @@
 
 > 注：随着新功能添加,对比可能过时
 
-
-
 ## 🔥 近期更新
+
 - 【2026-01-22】无模板模式与模板管理优化：
-  * 生成 PPT 图片不再强制选择模板：无模板资源时可直接生成，并自动生成/锁定 `template_style` 保持全局风格一致
-  * “更换模板”里支持**取消当前模板**，一键切换到无模板模式
-  * 优化“更换模板”弹窗：内容区可滚动、底部操作区固定可见，避免按钮被遮挡
-  * 优化“重新生成本页”交互：点击后即时提示并防重复提交，避免用户误以为未触发
+  - 生成 PPT 图片不再强制选择模板：无模板资源时可直接生成，并自动生成/锁定 `template_style` 保持全局风格一致
+  - “更换模板”里支持**取消当前模板**，一键切换到无模板模式
+  - 优化“更换模板”弹窗：内容区可滚动、底部操作区固定可见，避免按钮被遮挡
+  - 优化“重新生成本页”交互：点击后即时提示并防重复提交，避免用户误以为未触发
 - 【1-4】 : v0.3.0发布：可编辑pptx导出全面升级：
-  * 支持最大程度还原图片中文字的字号、颜色、加粗等样式；
-  * 支持了识别表格中的文字内容；
-  * 更精确的文字大小和文字位置还原逻辑
-  * 优化导出工作流，大大减少了导出后背景图残留文字的现象；
-  * 支持页面多选逻辑，灵活选择需要生成和导出的具体页面。
-  * **详细效果和使用方法见 https://github.com/Anionex/banana-slides/issues/121**
+  - 支持最大程度还原图片中文字的字号、颜色、加粗等样式；
+  - 支持了识别表格中的文字内容；
+  - 更精确的文字大小和文字位置还原逻辑
+  - 优化导出工作流，大大减少了导出后背景图残留文字的现象；
+  - 支持页面多选逻辑，灵活选择需要生成和导出的具体页面。
+  - **详细效果和使用方法见 https://github.com/Anionex/banana-slides/issues/121**
 
 - 【12-27】: 加入了对无图片模板模式的支持和较高质量的文字预设，现在可以通过纯文字描述的方式来控制ppt页面风格
 - 【12-24】: main分支加入了基于nano-banana-pro背景提取的可编辑pptx导出方法（目前Beta）
 
-
 ## 🗺️ 开发计划
 
-| 状态 | 里程碑 |
-| --- | --- |
-| ✅ 已完成 | 从想法、大纲、页面描述三种路径创建 PPT |
-| ✅ 已完成 | 解析文本中的 Markdown 格式图片 |
-| ✅ 已完成 | PPT 单页添加更多素材 |
-| ✅ 已完成 | PPT 单页框选区域Vibe口头编辑 |
-| ✅ 已完成 | 素材模块: 素材生成、上传等 |
-| ✅ 已完成 | 支持多种文件的上传+解析 |
-| ✅ 已完成 | 支持Vibe口头调整大纲和描述 |
-| ✅ 已完成 | 初步支持可编辑版本pptx文件导出 |
-| 🔄 进行中 | 支持多层次、精确抠图的可编辑pptx导出 |
-| 🔄 进行中 | 网络搜索 |
-| 🔄 进行中 | Agent 模式 |
+| 状态      | 里程碑                                                             |
+| --------- | ------------------------------------------------------------------ |
+| ✅ 已完成 | 从想法、大纲、页面描述三种路径创建 PPT                             |
+| ✅ 已完成 | 解析文本中的 Markdown 格式图片                                     |
+| ✅ 已完成 | PPT 单页添加更多素材                                               |
+| ✅ 已完成 | PPT 单页框选区域Vibe口头编辑                                       |
+| ✅ 已完成 | 素材模块: 素材生成、上传等                                         |
+| ✅ 已完成 | 支持多种文件的上传+解析                                            |
+| ✅ 已完成 | 支持Vibe口头调整大纲和描述                                         |
+| ✅ 已完成 | 初步支持可编辑版本pptx文件导出                                     |
+| 🔄 进行中 | 支持多层次、精确抠图的可编辑pptx导出                               |
+| 🔄 进行中 | 网络搜索                                                           |
+| 🔄 进行中 | Agent 模式                                                         |
 | 🧭 规划中 | 风格包（Style Packs）：小红书风格/信息卡片风/学术报告风/品牌风格等 |
-| 🧭 规划中 | 风格包管理：预览、版本、导入导出、项目级锁定与复用 |
-| 🧭 规划中 | 优化前端加载速度与生成反馈（避免重复提交、任务队列可视化） |
-| 🧭 规划中 | 在线播放功能 |
-| 🧭 规划中 | 简单的动画和页面切换效果 |
-| 🧭 规划中 | 多语种支持 |
-| 🧭 规划中 | 用户系统 |
+| 🧭 规划中 | 风格包管理：预览、版本、导入导出、项目级锁定与复用                 |
+| 🧭 规划中 | 优化前端加载速度与生成反馈（避免重复提交、任务队列可视化）         |
+| 🧭 规划中 | 在线播放功能                                                       |
+| 🧭 规划中 | 简单的动画和页面切换效果                                           |
+| 🧭 规划中 | 多语种支持                                                         |
+| 🧭 规划中 | 用户系统                                                           |
 
 ## 📦 使用方法
 
 ### 使用 Docker Compose🐳（推荐）
+
 这是最简单的部署方式，可以一键启动前后端服务。
 
 <details>
@@ -199,6 +201,7 @@
 </details>
 
 0. **克隆代码仓库**
+
 ```bash
 git clone https://github.com/flyyangX/vibe-banana-pro
 cd vibe-banana-pro
@@ -207,12 +210,15 @@ cd vibe-banana-pro
 1. **配置环境变量**
 
 创建 `.env` 文件（参考 `.env.example`）：
+
 ```bash
 cp .env.example .env
 ```
 
 编辑 `.env` 文件，配置必要的环境变量：
+
 > 提示：项目支持多种兼容的模型接口配置（Gemini/OpenAI/Vertex 等），你可以按自己的 API 服务商填写 `.env`。
+
 ```env
 # AI Provider格式配置 (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
@@ -259,10 +265,10 @@ IMAGE_MODEL=nano-banana-pro-cl
 ```
 
 支持的 `IMAGE_MODEL`（nano-banana）示例：`nano-banana-fast`、`nano-banana`、`nano-banana-pro`、`nano-banana-pro-vt`、`nano-banana-pro-cl`、`nano-banana-pro-vip`、`nano-banana-pro-4k-vip`。
+
 </details>
 
 **使用新版可编辑导出配置方法，获得更好的可编辑导出效果**: 需在[百度智能云平台](https://console.bce.baidu.com/iam/#/iam/apikey/list)中获取API KEY，填写在.env文件中的BAIDU_OCR_API_KEY字段（有充足的免费使用额度）。详见https://github.com/Anionex/banana-slides/issues/121 中的说明
-
 
 <details>
   <summary>📒 使用 Vertex AI（GCP 免费额度）</summary>
@@ -294,13 +300,15 @@ IMAGE_MODEL=nano-banana-pro-cl
 ```bash
 docker compose up -d
 ```
+
 更新：项目也在dockerhub提供了构建好的前端和后端镜像（同步主分支最新版本），名字分别为：
+
 1. anoinex/banana-slides-frontend
 2. anoinex/banana-slides-backend
 
-
 > [!TIP]
 > 如遇网络问题，可在 `.env` 文件中取消镜像源配置的注释, 再重新运行启动命令：
+>
 > ```env
 > # 在 .env 文件中取消以下注释即可使用国内镜像源
 > DOCKER_REGISTRY=docker.1ms.run/
@@ -309,7 +317,6 @@ docker compose up -d
 > PYPI_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
 > NPM_REGISTRY=https://registry.npmmirror.com/
 > ```
-
 
 3. **访问应用**
 
@@ -351,6 +358,7 @@ docker compose up -d
 ### 从源码部署
 
 #### 环境要求
+
 - Python 3.10 或更高版本
 - [uv](https://github.com/astral-sh/uv) - Python 包管理器
 - Node.js 16+ 和 npm
@@ -359,12 +367,14 @@ docker compose up -d
 #### 后端安装
 
 0. **克隆代码仓库**
+
 ```bash
 git clone https://github.com/flyyangX/vibe-banana-pro
 cd vibe-banana-pro
 ```
 
 1. **安装 uv（如果尚未安装）**
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
@@ -372,6 +382,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 2. **安装依赖**
 
 在项目根目录下运行：
+
 ```bash
 uv sync
 ```
@@ -381,12 +392,15 @@ uv sync
 3. **配置环境变量**
 
 复制环境变量模板：
+
 ```bash
 cp .env.example .env
 ```
 
 编辑 `.env` 文件，配置你的 API 密钥：
+
 > 提示：项目支持多种兼容的模型接口配置（Gemini/OpenAI/Vertex 等），你可以按自己的 API 服务商填写 `.env`。
+
 ```env
 # AI Provider格式配置 (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
@@ -414,11 +428,13 @@ BACKEND_PORT=5000
 #### 前端安装
 
 1. **进入前端目录**
+
 ```bash
 cd frontend
 ```
 
 2. **安装依赖**
+
 ```bash
 npm install
 ```
@@ -427,8 +443,8 @@ npm install
 
 前端会自动连接到 `http://localhost:5000` 的后端服务。如需修改，请编辑 `src/api/client.ts`。
 
-
 #### 启动后端服务
+
 > （可选）如果本地已有重要数据，升级前建议先备份数据库：  
 > `cp backend/instance/database.db backend/instance/database.db.bak`
 
@@ -452,10 +468,10 @@ npm run dev
 
 打开浏览器访问即可使用应用。
 
-
 ## 🛠️ 技术架构
 
 ### 前端技术栈
+
 - **框架**：React 18 + TypeScript
 - **构建工具**：Vite 5
 - **状态管理**：Zustand
@@ -466,6 +482,7 @@ npm run dev
 - **HTTP客户端**：Axios
 
 ### 后端技术栈
+
 - **语言**：Python 3.10+
 - **框架**：Flask 3.0
 - **包管理**：uv
@@ -590,6 +607,7 @@ banana-slides/
 ```
 
 **关键模块说明**：
+
 - **前端**：React + TypeScript + Zustand，页面按 `components/` + `hooks/` 模块化
 - **后端**：Flask + SQLAlchemy，服务层按功能域拆分（AI、导出、文件等）
 - **任务执行**：`backend/services/tasks/` 按领域拆分，`task_manager.py` 兼容入口
@@ -597,17 +615,17 @@ banana-slides/
 - **可编辑导出**：独立 `image_editability` 模块（OCR + AI + 背景重绘）
 
 **常见问题**
+
 1.  **支持免费层级的 Gemini API Key 吗？**
-    *   免费层级只支持文本生成，不支持图片生成。
+    - 免费层级只支持文本生成，不支持图片生成。
 2.  **生成内容时提示 503 错误或 Retry Error**
-    *   可以根据 README 中的命令查看 Docker 内部日志，定位 503 问题的详细报错，一般是模型配置不正确导致。
+    - 可以根据 README 中的命令查看 Docker 内部日志，定位 503 问题的详细报错，一般是模型配置不正确导致。
 3.  **.env 中设置了 API Key 之后，为什么不生效？**
     1.  运行时编辑.env需要重启 Docker 容器以应用更改。
     2.  如果曾在网页设置页中设置，会覆盖 `.env` 中参数，可通过“还原默认设置”还原到 `.env`。
 4.  **生成页面文字有乱码**
-    *   可以尝试更高分辨率的输出（openai格式可能不支持调高分辨率）
-    *   确保在页面描述中包含具体要渲染的文字内容
-  
+    - 可以尝试更高分辨率的输出（openai格式可能不支持调高分辨率）
+    - 确保在页面描述中包含具体要渲染的文字内容
 
 ## 🤝 贡献指南
 
@@ -623,7 +641,7 @@ banana-slides/
 
 可自由用于个人学习、研究、试验、教育或非营利科研活动等非商业用途；
 
-<details> 
+<details>
 
 <summary> 详情 </summary>
 本项目开源协议为非商业许可（CC BY-NC-SA），  
@@ -646,10 +664,7 @@ banana-slides/
 
 </details>
 
-
-
 ## 致谢
 
 - 上游项目：[`Anionex/banana-slides`](https://github.com/Anionex/banana-slides)
 - 社区与贡献者：感谢所有在上游与本仓库贡献代码、建议与反馈的朋友们
-  

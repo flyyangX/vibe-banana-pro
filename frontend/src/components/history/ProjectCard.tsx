@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, FileText, ChevronRight, Trash2 } from 'lucide-react';
-import { Card } from '@/components/shared';
-import { getProjectTitle, getFirstPageImage, formatDate, getStatusText, getStatusColor, getProjectDisplayCount } from '@/utils/projectUtils';
+import { getProjectTitle, getFirstPageImage, formatDate, getStatusText, getProjectDisplayCount } from '@/utils/projectUtils';
 import type { Project } from '@/types';
 
 export interface ProjectCardProps {
@@ -54,33 +53,33 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const title = getProjectTitle(project);
   const { count: displayCount, unit } = getProjectDisplayCount(project);
   const statusText = getStatusText(project);
-  const statusColor = getStatusColor(project);
+
   
   const firstPageImage = shouldLoadImage ? getFirstPageImage(project) : null;
 
   return (
-    <Card
-      className={`p-3 md:p-6 transition-all ${
+    <div
+      className={`p-4 md:p-6 transition-all border-b border-border bg-white group ${
         isSelected 
-          ? 'border-2 border-banana-500 bg-banana-50' 
-          : 'hover:shadow-lg border border-gray-200'
+          ? 'bg-gray-50' 
+          : 'hover:bg-gray-50'
       } ${isBatchMode ? 'cursor-default' : 'cursor-pointer'}`}
       onClick={() => onSelect(project)}
     >
-      <div className="flex items-start gap-3 md:gap-4">
+      <div className="flex items-start gap-4 md:gap-6">
         {/* 复选框 */}
-        <div className="pt-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="pt-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleSelect(projectId)}
-            className="w-4 h-4 text-banana-600 border-gray-300 rounded focus:ring-banana-500 cursor-pointer"
+            className="w-4 h-4 accent-black cursor-pointer"
           />
         </div>
         
         {/* 中间：项目信息 */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 md:gap-3 mb-2 flex-wrap">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             {isEditing ? (
               <input
                 type="text"
@@ -89,15 +88,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 onKeyDown={(e) => onTitleKeyDown(e, projectId)}
                 onBlur={() => onSaveEdit(projectId)}
                 autoFocus
-                className="text-base md:text-lg font-semibold text-gray-900 px-2 py-1 border border-banana-500 rounded focus:outline-none focus:ring-2 focus:ring-banana-500 flex-1 min-w-0"
+                className="text-lg font-serif font-medium text-primary px-2 py-1 border-b border-primary bg-transparent focus:outline-none w-full max-w-md"
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
               <h3 
-                className={`text-base md:text-lg font-semibold text-gray-900 truncate flex-1 min-w-0 ${
+                className={`text-lg font-serif font-medium text-primary truncate ${
                   isBatchMode 
                     ? 'cursor-default' 
-                    : 'cursor-pointer hover:text-banana-600 transition-colors'
+                    : 'cursor-pointer group-hover:text-black transition-colors'
                 }`}
                 onClick={(e) => onStartEdit(e, project)}
                 title={isBatchMode ? undefined : "点击编辑名称"}
@@ -105,50 +104,50 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 {title}
               </h3>
             )}
-            <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap flex-shrink-0 ${statusColor}`}>
+            <span className={`px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold border border-border text-secondary`}>
               {statusText}
             </span>
           </div>
-          <div className="flex items-center gap-3 md:gap-4 text-xs md:text-sm text-gray-500 flex-wrap">
-            <span className="flex items-center gap-1">
-              <FileText size={14} />
+          <div className="flex items-center gap-4 text-xs font-sans text-secondary flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <FileText size={12} />
               {displayCount} {unit}
             </span>
-            <span className="flex items-center gap-1">
-              <Clock size={14} />
+            <span className="flex items-center gap-1.5">
+              <Clock size={12} />
               {formatDate(project.updated_at || project.created_at)}
             </span>
           </div>
         </div>
         
         {/* 右侧：图片预览 */}
-        <div className="hidden sm:block w-40 h-24 md:w-64 md:h-36 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
+        <div className="hidden sm:block w-32 h-20 md:w-48 md:h-28 bg-gray-100 border border-border flex-shrink-0">
           {firstPageImage ? (
             <img
               src={firstPageImage}
               alt="第一页预览"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              <FileText size={20} className="md:w-6 md:h-6" />
+            <div className="w-full h-full flex items-center justify-center text-gray-300">
+              <span className="font-serif italic text-xs">No Preview</span>
             </div>
           )}
         </div>
         
         {/* 右侧：操作按钮 */}
-        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 flex-shrink-0 self-center">
           <button
             onClick={(e) => onDelete(e, project)}
-            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-2 text-secondary hover:text-black transition-colors opacity-0 group-hover:opacity-100"
             title="删除项目"
           >
-            <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
+            <Trash2 size={16} />
           </button>
-          <ChevronRight size={18} className="text-gray-400 md:w-5 md:h-5" />
+          <ChevronRight size={16} className="text-gray-300 group-hover:text-primary transition-colors" />
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 

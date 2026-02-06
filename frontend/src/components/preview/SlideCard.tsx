@@ -1,5 +1,6 @@
 import React from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
+import { ZoomIn, Move, Trash2, Image as ImageIcon, Edit2 } from 'lucide-react';
+import { Logo } from '@/components/shared';
 import { StatusBadge, Skeleton, useConfirm } from '@/components/shared';
 import { getImageUrl } from '@/api/client';
 import type { Page } from '@/types';
@@ -45,13 +46,13 @@ export const SlideCard: React.FC<SlideCardProps> = ({
 
   return (
     <div
-      className={`group cursor-pointer transition-all ${
-        isSelected ? 'ring-2 ring-banana-500' : ''
+      className={`group cursor-pointer transition-all border outline-none ${
+        isSelected ? 'border-primary ring-1 ring-primary bg-gray-50' : 'border-transparent hover:border-gray-200'
       }`}
       onClick={onClick}
     >
       {/* 缩略图 */}
-      <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden mb-2">
+      <div className="relative aspect-video bg-gray-50 overflow-hidden mb-2 border border-border">
         {generating ? (
           <Skeleton className="w-full h-full" />
         ) : page.generated_image_path ? (
@@ -62,15 +63,16 @@ export const SlideCard: React.FC<SlideCardProps> = ({
               className="w-full h-full object-cover"
             />
             {/* 悬停操作 */}
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 border border-primary">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="p-2 bg-white rounded-lg hover:bg-banana-50 transition-colors"
+                className="p-2 text-primary hover:bg-gray-100 transition-colors border border-primary rounded-none"
+                title="编辑"
               >
-                <Edit2 size={18} />
+                <Edit2 size={16} />
               </button>
               <button
                 onClick={(e) => {
@@ -81,25 +83,28 @@ export const SlideCard: React.FC<SlideCardProps> = ({
                     { title: '确认删除', variant: 'danger' }
                   );
                 }}
-                className="p-2 bg-white rounded-lg hover:bg-red-50 transition-colors"
+                className="p-2 text-primary hover:bg-red-50 hover:text-red-600 transition-colors border border-primary hover:border-red-600 rounded-none"
+                title="删除"
               >
-                <Trash2 size={18} className="text-red-600" />
+                <Trash2 size={16} />
               </button>
             </div>
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
+          <div className="w-full h-full flex items-center justify-center text-gray-300">
             <div className="text-center">
-              <div className="text-3xl mb-1">🍌</div>
-              <div className="text-xs">未生成</div>
+              <div className="mb-1 flex justify-center opacity-50 grayscale">
+                <Logo size="md" showText={false} />
+              </div>
+              <div className="text-[10px] font-sans uppercase tracking-wider">Not Generated</div>
             </div>
           </div>
         )}
         
         {/* 计时角标 */}
         {generating && typeof elapsedSeconds === 'number' && (
-          <div className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded bg-black/60 text-white">
-            ⏱ {formatElapsed(elapsedSeconds)}
+          <div className="absolute top-2 left-2 text-[10px] px-2 py-0.5 bg-black text-white font-mono">
+            {formatElapsed(elapsedSeconds)}
           </div>
         )}
 
@@ -110,13 +115,13 @@ export const SlideCard: React.FC<SlideCardProps> = ({
       </div>
 
       {/* 标题 */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 px-1">
         <span
-          className={`text-sm font-medium ${
-            isSelected ? 'text-banana-600' : 'text-gray-700'
+          className={`text-xs font-sans truncate ${
+            isSelected ? 'text-primary font-bold' : 'text-secondary'
           }`}
         >
-          {index + 1}. {page.outline_content.title}
+          {String(index + 1).padStart(2, '0')}. {page.outline_content.title}
         </span>
       </div>
       {ConfirmDialog}

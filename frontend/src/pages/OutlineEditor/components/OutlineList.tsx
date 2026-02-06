@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, FileText, Download, Save } from 'lucide-react';
+import { Plus, FileText } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -13,7 +13,6 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button, ProjectResourcesList } from '@/components/shared';
 import { OutlineCard } from '@/components/outline/OutlineCard';
 import type { Page, Project } from '@/types';
 
@@ -32,9 +31,11 @@ const SortableCard: React.FC<{
     id: props.page.id || `page-${props.index}`,
   });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+    touchAction: 'pan-y', // Critical: Explicitly allow vertical scrolling on the card
+    WebkitTouchCallout: 'none', // Prevent iOS context menu on long press
   };
 
   return (
@@ -227,24 +228,14 @@ interface OutlineListProps {
   onGenerateOutline: () => void;
   onExportOutline: () => void;
   onSaveAllPages: () => Promise<void>;
-  onFileClick: (fileId: string) => void;
 }
 
+// Simplified OutlineList
 export const OutlineList: React.FC<OutlineListProps> = ({
   currentProject,
   projectId,
   selectedPageId,
   isAiRefining,
-  outlinePageCount,
-  setOutlinePageCount,
-  infographicMode,
-  setInfographicMode,
-  pptAspectRatio,
-  setPptAspectRatio,
-  infographicAspectRatio,
-  setInfographicAspectRatio,
-  xhsAspectRatio,
-  setXhsAspectRatio,
   sensors,
   onDragEnd,
   onPageSelect,
@@ -254,122 +245,84 @@ export const OutlineList: React.FC<OutlineListProps> = ({
   onGenerateOutline,
   onExportOutline,
   onSaveAllPages,
-  onFileClick,
+
 }) => {
   return (
-    <div className="flex-1 p-3 md:p-6 overflow-y-auto min-h-0">
-      <div className="max-w-4xl mx-auto">
-        {/* 生成设置 */}
-        <GenerationSettings
-          currentProject={currentProject}
-          outlinePageCount={outlinePageCount}
-          setOutlinePageCount={setOutlinePageCount}
-          infographicMode={infographicMode}
-          setInfographicMode={setInfographicMode}
-          pptAspectRatio={pptAspectRatio}
-          setPptAspectRatio={setPptAspectRatio}
-          infographicAspectRatio={infographicAspectRatio}
-          setInfographicAspectRatio={setInfographicAspectRatio}
-          xhsAspectRatio={xhsAspectRatio}
-          setXhsAspectRatio={setXhsAspectRatio}
-        />
-
-        {/* 操作按钮 */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4 md:mb-6">
-          <Button
-            variant="primary"
-            icon={<Plus size={16} className="md:w-[18px] md:h-[18px]" />}
-            onClick={onAddPage}
-            className="w-full sm:w-auto text-sm md:text-base"
-          >
-            添加页面
-          </Button>
-          {currentProject.pages.length === 0 ? (
-            <Button
-              variant="secondary"
-              onClick={onGenerateOutline}
-              className="w-full sm:w-auto text-sm md:text-base"
-            >
-              {currentProject.creation_type === 'outline' ? '解析大纲' : '自动生成大纲'}
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              onClick={onGenerateOutline}
-              className="w-full sm:w-auto text-sm md:text-base"
-            >
-              {currentProject.creation_type === 'outline' ? '重新解析大纲' : '重新生成大纲'}
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            icon={<Download size={16} className="md:w-[18px] md:h-[18px]" />}
-            onClick={onExportOutline}
-            disabled={currentProject.pages.length === 0}
-            className="w-full sm:w-auto text-sm md:text-base"
-          >
-            导出大纲
-          </Button>
-          {/* 手机端：保存按钮 */}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Save size={16} className="md:w-[18px] md:h-[18px]" />}
-            onClick={onSaveAllPages}
-            className="md:hidden w-full sm:w-auto text-sm md:text-base"
-          >
-            保存
-          </Button>
-        </div>
-
-        {/* 项目资源列表（文件和图片） */}
-        <ProjectResourcesList
-          projectId={projectId || null}
-          onFileClick={onFileClick}
-          showFiles={true}
-          showImages={true}
-        />
-
-        {/* 大纲卡片列表 */}
+    <div className="px-4 py-8 pb-32">
+      <div className="max-w-2xl mx-auto space-y-8">
+        
+        {/* Actions Header (Inline with list or Sticky) */}
+        {/* We moved major actions to the parent, but "Add Page" feels right inside the list flow or at bottom */}
+        
         {currentProject.pages.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="text-center py-20 border border-dashed border-gray-300">
             <div className="flex justify-center mb-4">
-              <FileText size={64} className="text-gray-300" />
+              <FileText size={48} className="text-gray-300" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              还没有页面
+            <h3 className="text-sm font-bold uppercase tracking-wider text-black mb-2">
+              Empty Outline
             </h3>
-            <p className="text-gray-500 mb-6">
-              点击"添加页面"手动创建，或"自动生成大纲"让 AI 帮你完成
+            <p className="text-xs text-gray-500 mb-6 max-w-xs mx-auto">
+              Start by adding a page manually or generating one with AI.
             </p>
+            <div className="flex justify-center gap-3">
+               <button onClick={onAddPage} className="px-4 py-2 bg-black text-white text-xs font-bold uppercase hover:bg-gray-800 transition-colors">
+                  Add Page
+               </button>
+               <button onClick={onGenerateOutline} className="px-4 py-2 border border-black text-black text-xs font-bold uppercase hover:bg-black hover:text-white transition-colors">
+                  Generate with AI
+               </button>
+            </div>
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={onDragEnd}
-          >
-            <SortableContext
-              items={currentProject.pages.map((p, idx) => p.id || `page-${idx}`)}
-              strategy={verticalListSortingStrategy}
+          <>
+            <div className="flex justify-between items-end pb-2 border-b border-black mb-6">
+                <span className="text-xs font-bold uppercase text-gray-400 tracking-wider count">
+                   {currentProject.pages.length} Pages
+                </span>
+                <button 
+                  onClick={onAddPage}
+                  className="flex items-center gap-1 text-[10px] font-bold uppercase bg-black text-white px-3 h-8 hover:bg-gray-800 transition-colors"
+                >
+                  <Plus size={12} /> Add Page
+                </button>
+            </div>
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={onDragEnd}
             >
-              <div className="space-y-4">
-                {currentProject.pages.map((page, index) => (
-                  <SortableCard
-                    key={page.id || `page-${index}`}
-                    page={page}
-                    index={index}
-                    totalPages={currentProject.pages.length}
-                    onUpdate={(data) => page.id && onPageUpdate(page.id, data)}
-                    onDelete={() => page.id && onPageDelete(page.id)}
-                    onClick={() => onPageSelect(page.id || null)}
-                    isSelected={selectedPageId === page.id}
-                    isAiRefining={isAiRefining}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+              <SortableContext
+                items={currentProject.pages.map((p, idx) => p.id || `page-${idx}`)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4 pb-20">
+                  {currentProject.pages.map((page, index) => (
+                    <SortableCard
+                      key={page.id || `page-${index}`}
+                      page={page}
+                      index={index}
+                      totalPages={currentProject.pages.length}
+                      onUpdate={(data) => page.id && onPageUpdate(page.id, data)}
+                      onDelete={() => page.id && onPageDelete(page.id)}
+                      onClick={() => onPageSelect(page.id || null)}
+                      isSelected={selectedPageId === page.id}
+                      isAiRefining={isAiRefining}
+                    />
+                  ))}
+                  
+                  {/* Append Add Button at bottom for flow */}
+                  <div 
+                    onClick={onAddPage}
+                    className="h-12 border border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 transition-all group"
+                  >
+                     <Plus size={16} className="text-gray-400 group-hover:text-black transition-colors" />
+                  </div>
+                </div>
+              </SortableContext>
+            </DndContext>
+          </>
         )}
       </div>
     </div>

@@ -124,7 +124,7 @@ export const XhsPreview: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       <XhsToolbar
         projectId={projectId}
         projectTitle={currentProject?.idea_prompt}
@@ -168,20 +168,21 @@ export const XhsPreview: React.FC = () => {
 
       {/* 导出弹窗 */}
       <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="导出图片" size="xl">
-        <div className="space-y-4">
-          <div className="text-sm text-gray-600">
+        <div className="space-y-6">
+          <div className="text-sm text-gray-500 bg-gray-50 p-3 border border-gray-200">
             选择要导出的图片范围与导出方式。
-            <span className="text-gray-500 text-xs">推荐 ZIP：更稳定，不受浏览器多文件下载限制。</span>
+            <span className="block mt-1 font-bold text-black text-xs">推荐：批量导出时请使用 ZIP 格式。</span>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-gray-700">选择图片</div>
-              <Button variant="ghost" size="sm" onClick={handleToggleSelectAll}>
+          
+          <div className="bg-white space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <div className="text-sm font-bold text-black">选择图片</div>
+              <Button variant="ghost" size="sm" onClick={handleToggleSelectAll} className="h-8 text-xs font-bold tracking-wide hover:bg-gray-100 rounded-none">
                 {allSelected ? '取消全选' : '全选'}
               </Button>
             </div>
-            <div className="text-xs text-gray-500">点击图片即可选中或取消，仅可选择已生成的图片。</div>
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+            
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
               {xhsDisplayCards.map((card) => {
                 const selectable = Boolean(card.imageUrl);
                 const selected = exportSelectedIndices.has(card.index);
@@ -192,81 +193,88 @@ export const XhsPreview: React.FC = () => {
                     key={`export-card-${card.index}`}
                     onClick={() => selectable && toggleExportIndex(card.index)}
                     disabled={!selectable}
-                    className={`relative rounded-lg border overflow-hidden transition focus-visible:ring-2 focus-visible:ring-banana-500 focus-visible:ring-offset-2 ${
-                      selected ? 'border-banana-500 ring-2 ring-banana-200' : 'border-gray-200 hover:border-banana-500'
-                    } ${!selectable ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`relative border overflow-hidden transition-all group ${
+                      selected ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-black'
+                    } ${!selectable ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'bg-white'}`}
                   >
-                    <div className="relative w-full aspect-[3/4] bg-gray-100">
+                    <div className="relative w-full aspect-[3/4] bg-gray-50">
                       {card.imageUrl ? (
                         <img src={card.imageUrl} alt={roleLabel} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[11px] text-gray-400">
-                          未生成
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-[10px] text-gray-400 font-mono">未生成</span>
                         </div>
                       )}
                       {selected && (
-                        <span className="absolute top-1 right-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-banana-500 text-white text-[10px]">
-                          <Check size={12} />
-                        </span>
+                        <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                          <div className="bg-black text-white p-1 shadow-sm">
+                            <Check size={16} />
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="px-2 py-1 text-[11px] text-gray-600 flex items-center justify-between">
-                      <span className="truncate">
-                        {String(card.index + 1).padStart(2, '0')}-{roleLabel}
+                    <div className={`px-2 py-1.5 text-[10px] flex items-center justify-between border-t ${selected ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-100'}`}>
+                      <span className="font-mono">
+                        {String(card.index + 1).padStart(2, '0')}. {roleLabel}
                       </span>
-                      {card.sizeLabel ? <span className="text-[10px] text-gray-400">{card.sizeLabel}</span> : null}
                     </div>
-                    {!selectable && (
-                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-[11px] text-gray-500">
-                        未生成
-                      </div>
-                    )}
                   </button>
                 );
               })}
             </div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-            <div className="text-sm font-semibold text-gray-700">导出方式</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+
+          <div className="bg-white space-y-3 pt-2">
+            <div className="text-sm font-bold text-black border-b border-gray-100 pb-2">导出方式</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setExportMode('zip')}
-                className={`p-3 rounded border text-left ${
-                  exportMode === 'zip' ? 'border-banana-500 bg-banana-50' : 'border-gray-200 hover:bg-gray-50'
+                className={`p-4 border text-left transition-all ${
+                  exportMode === 'zip' 
+                    ? 'border-black bg-black text-white ring-1 ring-black' 
+                    : 'border-gray-200 bg-white hover:border-black text-gray-900'
                 }`}
               >
-                <div className="font-medium text-gray-800">打包 ZIP（推荐）</div>
-                <div className="text-xs text-gray-500 mt-1">稳定下载，按顺序命名 01.png、02.png…</div>
+                <div className="font-bold text-sm">压缩包导出 (ZIP)</div>
+                <div className={`text-xs mt-1 opacity-80 ${exportMode === 'zip' ? 'text-gray-300' : 'text-gray-500'}`}>
+                  推荐：打包下载所有选中图片，按顺序命名。
+                </div>
               </button>
               <button
                 type="button"
                 onClick={() => setExportMode('single')}
-                className={`p-3 rounded border text-left ${
-                  exportMode === 'single' ? 'border-banana-500 bg-banana-50' : 'border-gray-200 hover:bg-gray-50'
+                className={`p-4 border text-left transition-all ${
+                  exportMode === 'single' 
+                    ? 'border-black bg-black text-white ring-1 ring-black' 
+                    : 'border-gray-200 bg-white hover:border-black text-gray-900'
                 }`}
               >
-                <div className="font-medium text-gray-800">单张下载（逐张）</div>
-                <div className="text-xs text-gray-500 mt-1">会逐张打开图片页，可能被浏览器拦截</div>
+                <div className="font-bold text-sm">逐张下载</div>
+                <div className={`text-xs mt-1 opacity-80 ${exportMode === 'single' ? 'text-gray-300' : 'text-gray-500'}`}>
+                  会逐张打开图片下载页面，可能被浏览器拦截。
+                </div>
               </button>
             </div>
             {exportMode === 'single' && exportSelectedIndices.size >= 3 && (
-              <div className="flex items-start gap-2 text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
-                <AlertTriangle size={16} className="mt-0.5" />
-                <div>多张下载可能被浏览器拦截。建议改用 ZIP 导出。</div>
+              <div className="flex items-start gap-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 p-3 mt-2">
+                <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-amber-600" />
+                <div>连续下载多张图片可能会被浏览器弹窗拦截，建议使用 ZIP 导出。</div>
               </div>
             )}
           </div>
-          <div className="flex justify-end gap-3 pt-1">
-            <Button variant="ghost" onClick={() => setIsExportModalOpen(false)} disabled={isExporting}>
+          
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <Button variant="ghost" onClick={() => setIsExportModalOpen(false)} disabled={isExporting} className="text-xs font-bold rounded-none">
               取消
             </Button>
             <Button
               variant="primary"
               onClick={handleConfirmExport}
               disabled={isExporting || exportSelectedIndices.size === 0}
+              className="bg-black text-white hover:bg-gray-800 rounded-none px-6 text-xs font-bold"
             >
-              {isExporting ? '导出中...' : exportMode === 'zip' ? '导出 ZIP' : '开始下载'}
+              {isExporting ? '导出中...' : exportMode === 'zip' ? '下载 ZIP' : '下载选中图片'}
             </Button>
           </div>
         </div>
@@ -281,7 +289,7 @@ export const XhsPreview: React.FC = () => {
       >
         {previewImageUrl ? (
           <div className="space-y-4">
-            <div className="max-h-[70vh] w-full flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+            <div className="max-h-[70vh] w-full flex items-center justify-center bg-gray-50 overflow-hidden">
               <img src={previewImageUrl} alt={previewTitle || 'preview'} className="max-h-[70vh] w-auto object-contain" />
             </div>
             <div className="flex justify-end">

@@ -112,18 +112,18 @@ export const InfographicSidebar: React.FC<InfographicSidebarProps> = ({
       <div>
         {isTemplateModalOpen && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold">更换模板</h2>
+            <div className="bg-white shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden border border-border">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white">
+                <h2 className="text-lg font-serif font-medium text-primary">更换模板</h2>
                 <button
                   onClick={onCloseTemplateModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 transition-colors rounded-none"
                   aria-label="关闭"
                 >
                   <X size={18} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 bg-white">
                 <TemplateSelector
                   onSelect={onTemplateSelect}
                   selectedTemplateId={selectedTemplateId}
@@ -135,11 +135,12 @@ export const InfographicSidebar: React.FC<InfographicSidebarProps> = ({
                   onTemplatesGenerated={onTemplatesGenerated}
                 />
               </div>
-              <div className="shrink-0 px-6 py-4 border-t flex justify-end gap-3">
+              <div className="shrink-0 px-6 py-4 border-t border-border flex justify-end gap-3 bg-white">
                 <Button
                   variant="secondary"
                   onClick={onClearTemplate}
                   disabled={isUploadingTemplate || isClearingTemplate || !hasTemplateResource}
+                  className="rounded-none hover:bg-gray-100"
                 >
                   取消当前模板
                 </Button>
@@ -147,6 +148,7 @@ export const InfographicSidebar: React.FC<InfographicSidebarProps> = ({
                   variant="ghost"
                   onClick={onCloseTemplateModal}
                   disabled={isUploadingTemplate || isClearingTemplate}
+                  className="rounded-none hover:bg-gray-100"
                 >
                   关闭
                 </Button>

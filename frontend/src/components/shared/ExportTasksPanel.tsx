@@ -58,7 +58,7 @@ const TaskStatusIcon: React.FC<{ status: ExportTask['status'] }> = ({ status }) 
       return <Clock size={16} className="text-gray-400" />;
     case 'PROCESSING':
     case 'RUNNING':
-      return <Loader2 size={16} className="text-banana-500 animate-spin" />;
+      return <Loader2 size={16} className="text-black animate-spin" />;
     case 'COMPLETED':
       return <CheckCircle size={16} className="text-green-500" />;
     case 'FAILED':
@@ -80,59 +80,58 @@ const WarningsModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 背景遮罩 */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
       
       {/* Modal 内容 */}
-      <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
+      <div className="relative bg-white text-left shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col border border-black transition-all">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-amber-50">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-500" />
-            <h3 className="text-base font-semibold text-amber-800">
-              导出警告 ({warnings.length} 条)
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-black" />
+            <h3 className="text-base font-bold text-black uppercase tracking-wide">
+              Export Warnings ({warnings.length})
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-amber-100 rounded transition-colors"
+            className="p-1 hover:bg-gray-100 transition-colors"
           >
-            <X size={18} className="text-gray-500" />
+            <X size={20} className="text-black" />
           </button>
         </div>
         
         {/* 警告列表 */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-2">
             {warnings.map((warning, idx) => (
               <div
                 key={idx}
-                className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800"
+                className="flex items-start gap-3 p-3 bg-gray-50 border border-t-0 border-r-0 border-b-0 border-l-4 border-amber-500 text-sm font-mono text-gray-800"
               >
-                <span className="text-amber-500 mt-0.5">•</span>
-                <span className="break-words">{warning}</span>
+                <div className="flex-1 break-words">{warning}</div>
               </div>
             ))}
           </div>
           
           {/* 详细信息（如果有） */}
           {warningDetails && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">详细信息</h4>
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <h4 className="text-sm font-bold text-black mb-3">Details</h4>
               
               {warningDetails.style_extraction_failed?.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs text-gray-500 mb-1">
-                    样式提取失败 ({warningDetails.style_extraction_failed.length} 个)
+                <div className="mb-4">
+                  <p className="text-xs font-bold text-gray-500 mb-2 uppercase">
+                    Style Extraction Failed ({warningDetails.style_extraction_failed.length})
                   </p>
-                  <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                  <div className="text-xs text-xs font-mono text-gray-600 bg-gray-50 p-3 border border-gray-200 max-h-32 overflow-y-auto">
                     {warningDetails.style_extraction_failed.slice(0, 10).map((item: any, idx: number) => (
-                      <div key={idx} className="truncate" title={item.reason}>
-                        • {item.element_id}: {item.reason}
+                      <div key={idx} className="truncate mb-1 last:mb-0" title={item.reason}>
+                        [{item.element_id}] {item.reason}
                       </div>
                     ))}
                     {warningDetails.style_extraction_failed.length > 10 && (
-                      <div className="text-gray-400 mt-1">
-                        ... 还有 {warningDetails.style_extraction_failed.length - 10} 条
+                      <div className="text-gray-400 mt-2 italic">
+                        ... plus {warningDetails.style_extraction_failed.length - 10} more
                       </div>
                     )}
                   </div>
@@ -140,14 +139,14 @@ const WarningsModal: React.FC<{
               )}
               
               {warningDetails.text_render_failed?.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs text-gray-500 mb-1">
-                    文本渲染失败 ({warningDetails.text_render_failed.length} 个)
+                <div className="mb-4">
+                  <p className="text-xs font-bold text-gray-500 mb-2 uppercase">
+                    Text Render Failed ({warningDetails.text_render_failed.length})
                   </p>
-                  <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                  <div className="text-xs font-mono text-gray-600 bg-gray-50 p-3 border border-gray-200 max-h-32 overflow-y-auto">
                     {warningDetails.text_render_failed.slice(0, 10).map((item: any, idx: number) => (
-                      <div key={idx} className="truncate" title={item.reason}>
-                        • "{item.text}": {item.reason}
+                      <div key={idx} className="truncate mb-1 last:mb-0" title={item.reason}>
+                        "{item.text}": {item.reason}
                       </div>
                     ))}
                   </div>
@@ -158,12 +157,12 @@ const WarningsModal: React.FC<{
         </div>
         
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-sm font-medium transition-colors"
+            className="w-full px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm font-bold uppercase tracking-wide transition-colors"
           >
-            关闭
+            Close
           </button>
         </div>
       </div>
@@ -197,55 +196,55 @@ const TaskItem: React.FC<{ task: ExportTask; pages: Page[]; onRemove: () => void
   const hasWarnings = task.status === 'COMPLETED' && task.progress?.warnings && task.progress.warnings.length > 0;
 
   return (
-    <div className="flex items-start gap-3 py-2.5 px-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="mt-0.5">
+    <div className="flex items-start gap-4 py-3 px-4 border-b border-border hover:bg-gray-50 transition-colors last:border-b-0">
+      <div className="mt-1">
         <TaskStatusIcon status={task.status} />
       </div>
       
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-gray-700 truncate">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-sm font-bold text-black truncate uppercase tracking-tight">
             {taskTypeLabels[task.type]}
           </span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 font-mono border border-gray-200 px-1 py-0.5">
             {pageRangeText}
           </span>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 font-mono ml-auto">
             {formatTime(task.createdAt)}
           </span>
         </div>
         
         {/* 进度条 - 显示在进行中的任务 */}
         {isProcessing && (
-          <div className="mt-2 space-y-1.5">
+          <div className="mt-3 space-y-2">
             {task.progress ? (
               <>
                 {/* 进度百分比和当前步骤 */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-banana-600">
-                    {progressPercent > 0 ? `${progressPercent}%` : '准备中...'}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-black">
+                    {progressPercent > 0 ? `${progressPercent}%` : 'PREPARING...'}
                   </span>
                   {task.progress.current_step && (
-                    <span className="text-xs text-gray-500 truncate max-w-[140px]" title={task.progress.current_step}>
+                    <span className="text-gray-500 truncate max-w-[140px]" title={task.progress.current_step}>
                       {task.progress.current_step}
                     </span>
                   )}
                 </div>
                 
                 {/* 进度条 */}
-                <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                <div className="h-1.5 bg-gray-100 rounded-none overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-banana-500 to-banana-600 transition-all duration-500 ease-out"
+                    className="h-full bg-black transition-all duration-500 ease-out"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
                 
                 {/* 显示消息日志（如果有） */}
                 {task.progress.messages && task.progress.messages.length > 0 && (
-                  <div className="mt-1.5 space-y-0.5">
+                  <div className="mt-1 space-y-0.5">
                     {task.progress.messages.slice(-2).map((msg, idx) => (
-                      <div key={idx} className="text-xs text-gray-500 truncate" title={msg}>
-                        {msg}
+                      <div key={idx} className="text-[10px] text-gray-400 truncate font-mono" title={msg}>
+                        {'>'} {msg}
                       </div>
                     ))}
                   </div>
@@ -253,18 +252,18 @@ const TaskItem: React.FC<{ task: ExportTask; pages: Page[]; onRemove: () => void
               </>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="h-2.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-banana-500 animate-pulse" style={{ width: '30%' }} />
+                <div className="h-1.5 w-full bg-gray-100 rounded-none overflow-hidden">
+                  <div className="h-full bg-black animate-pulse" style={{ width: '30%' }} />
                 </div>
-                <span className="text-xs text-gray-500 whitespace-nowrap">等待中...</span>
+                <span className="text-xs text-gray-400 whitespace-nowrap uppercase">Pending...</span>
               </div>
             )}
           </div>
         )}
         
         {task.status === 'FAILED' && task.errorMessage && (
-          <p className="text-xs text-red-500 mt-1 truncate" title={task.errorMessage}>
-            {task.errorMessage}
+          <p className="text-xs text-red-600 mt-2 font-mono border-l-2 border-red-500 pl-2 py-1 bg-red-50 truncate" title={task.errorMessage}>
+            ERROR: {task.errorMessage}
           </p>
         )}
         
@@ -273,15 +272,15 @@ const TaskItem: React.FC<{ task: ExportTask; pages: Page[]; onRemove: () => void
           <>
             <button
               onClick={() => setShowWarningsModal(true)}
-              className="mt-1.5 w-full text-left px-2 py-1.5 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 transition-colors"
+              className="mt-2 w-full text-left px-3 py-2 bg-amber-50/50 border border-amber-200 hover:border-amber-400 hover:bg-amber-50 transition-all group"
             >
-              <div className="flex items-center gap-1.5">
-                <AlertTriangle size={12} className="text-amber-500 flex-shrink-0" />
-                <span className="text-xs font-medium text-amber-700">
-                  {task.progress?.warnings?.length ?? 0} 条警告
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                <span className="text-xs font-bold text-amber-800 uppercase tracking-wide">
+                  {task.progress?.warnings?.length ?? 0} Warnings
                 </span>
-                <span className="text-[11px] text-amber-500 ml-auto">
-                  点击查看
+                <span className="text-[10px] text-amber-500 ml-auto uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+                  View Details
                 </span>
               </div>
             </button>
@@ -361,22 +360,22 @@ export const ExportTasksPanel: React.FC<ExportTasksPanelProps> = ({ projectId, p
   
   return (
     <div className={cn(
-      "bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden",
+      "bg-white shadow-xl border border-border overflow-hidden",
       className
     )}>
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+        className="w-full px-4 py-3 flex items-center bg-white hover:bg-gray-50 transition-colors border-b border-border"
       >
         <div className="flex items-center gap-2">
-          <FileText size={18} className="text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">
+          <FileText size={18} className="text-primary" />
+          <span className="text-sm font-medium text-primary">
             导出任务
           </span>
           {activeTasks.length > 0 && (
-            <span className="px-1.5 py-0.5 text-xs bg-banana-100 text-banana-700 rounded-full">
-              {activeTasks.length} 进行中
+            <span className="px-1.5 py-0.5 text-xs bg-black text-white font-mono">
+              {activeTasks.length} RUNNING
             </span>
           )}
         </div>
@@ -384,10 +383,10 @@ export const ExportTasksPanel: React.FC<ExportTasksPanelProps> = ({ projectId, p
       
       {/* Content */}
       {isExpanded && (
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-96 overflow-y-auto bg-white">
           {/* Active tasks */}
           {activeTasks.length > 0 && (
-            <div className="p-2 border-b border-gray-100">
+            <div className="p-0 border-b border-border">
               {activeTasks.map(task => (
                 <TaskItem 
                   key={task.id} 
@@ -401,15 +400,15 @@ export const ExportTasksPanel: React.FC<ExportTasksPanelProps> = ({ projectId, p
           
           {/* Completed tasks */}
           {completedTasks.length > 0 && (
-            <div className="p-2">
-              <div className="flex items-center justify-between px-3 py-1 mb-1">
-                <span className="text-xs text-gray-400">历史记录</span>
+            <div className="p-0">
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-border">
+                <span className="text-xs text-secondary font-medium uppercase tracking-wider">History</span>
                 <button
                   onClick={clearCompleted}
-                  className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                  className="text-xs text-secondary hover:text-black flex items-center gap-1 transition-colors"
                 >
                   <Trash2 size={12} />
-                  清除
+                  Clear
                 </button>
               </div>
               {completedTasks.map(task => (

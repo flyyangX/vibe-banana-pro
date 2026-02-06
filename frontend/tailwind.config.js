@@ -8,48 +8,36 @@ export default {
     extend: {
       colors: {
         'banana': {
-          50: '#FFF9E6',
-          100: '#FFE44D',
-          500: '#FFD700',
-          600: '#FFC700',
+          50: '#F9F9F9', // Very light gray for backgrounds
+          100: '#F0F0F0',
+          500: '#111111', // Primary Black
+          600: '#000000',
         },
+        primary: '#111111',
+        secondary: '#666666',
+        accent: '#2563eb', // Electric Blue for active states
+        border: '#e5e5e5',
+        background: '#ffffff',
+      },
+      fontFamily: {
+        serif: ['"Bodoni Moda"', 'serif'],
+        sans: ['"Inter"', 'sans-serif'],
       },
       borderRadius: {
-        'card': '12px',
-        'panel': '16px',
+        'none': '0',
+        'sm': '0.125rem',
+        DEFAULT: '0px', // Sharp corners default
+        'md': '0.375rem',
+        'lg': '0.5rem',
+        'full': '9999px',
+        'card': '0px', // Explicitly override
+        'panel': '0px',
       },
       boxShadow: {
-        'yellow': '0 4px 12px rgba(255, 215, 0, 0.3)',
         'sm': '0 1px 2px rgba(0,0,0,0.05)',
-        'md': '0 4px 6px rgba(0,0,0,0.07)',
-        'lg': '0 10px 15px rgba(0,0,0,0.1)',
-        'xl': '0 20px 25px rgba(0,0,0,0.15)',
-        '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-        '3xl': '0 35px 60px -12px rgba(0, 0, 0, 0.2)',
-      },
-      animation: {
-        'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'shimmer': 'shimmer 1.5s infinite',
-        'gradient': 'gradient 3s ease infinite',
-        'gradient-x': 'gradient-x 2s ease infinite',
-      },
-      keyframes: {
-        pulse: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.6' },
-        },
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
-        },
-        gradient: {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-        },
-        'gradient-x': {
-          '0%, 100%': { backgroundPosition: '0% 0%' },
-          '50%': { backgroundPosition: '100% 0%' },
-        },
+        'md': '0 4px 6px rgba(0,0,0,0.05)',
+        'lg': '0 10px 15px rgba(0,0,0,0.05)',
+        'xl': '0 20px 25px rgba(0,0,0,0.05)',
       },
     },
   },

@@ -29,27 +29,83 @@ export const getProjectTitle = (project: Project): string => {
   return '未命名项目';
 };
 
+const parseJsonSafe = (raw: unknown): any => {
+  if (!raw) return null;
+  if (typeof raw === 'object') return raw;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const parseMaterialNote = (note?: string | null): Record<string, any> | null => {
+  if (!note) return null;
+  try {
+    return JSON.parse(note);
+  } catch {
+    return null;
+  }
+};
+
+const getGeneratedMaterials = (project: Project) => {
+  const materials = (project as Project & { materials?: Array<{ url?: string; note?: string; updated_at?: string; created_at?: string }> }).materials || [];
+  if (!materials.length) return [];
+  const isInfographic = project.product_type === 'infographic';
+  const isXhs = project.product_type === 'xiaohongshu';
+  if (!isInfographic && !isXhs) return [];
+
+  const filtered = materials.filter((m) => {
+    if (!m.url) return false;
+    const note = parseMaterialNote(m.note);
+    if (!note) return true;
+    if (isInfographic) return note.type === 'infographic';
+    if (isXhs) return note.type === 'xhs';
+    return true;
+  });
+
+  return filtered.length ? filtered : materials.filter((m) => m.url);
+};
+
+const getGeneratedPages = (project: Project) => {
+  const pages = project.pages || [];
+  return pages.filter((p) => p.generated_image_url);
+};
+
+const getGeneratedImageCount = (project: Project): number => {
+  const materials = getGeneratedMaterials(project);
+  if (materials.length > 0) return materials.length;
+  const pages = getGeneratedPages(project);
+  return pages.length;
+};
+
 /**
- * 获取第一页图片URL（PPT 用 pages，信息图/小红书用 materials）
+ * 获取第一页图片URL（PPT 用 pages，信息图/小红书优先用生成图）
  */
 export const getFirstPageImage = (project: Project): string | null => {
   const isInfographic = project.product_type === 'infographic';
   const isXhs = project.product_type === 'xiaohongshu';
 
   if (isInfographic || isXhs) {
-    const materials = (project as Project & { materials?: Array<{ url: string; updated_at?: string; created_at?: string }> }).materials;
-    if (materials?.length) {
-      const firstWithUrl = materials.find((m) => m.url);
+    const materials = getGeneratedMaterials(project);
+    if (materials.length) {
+      const sorted = [...materials].sort((a, b) => {
+        const ta = new Date(a.updated_at || a.created_at || 0).getTime();
+        const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+        return tb - ta;
+      });
+      const firstWithUrl = sorted[0];
       if (firstWithUrl?.url) {
         return getImageUrl(firstWithUrl.url, firstWithUrl.updated_at || firstWithUrl.created_at);
       }
     }
-    // XHS 可能仍主要依赖 pages 出图，materials 为空时回退到 pages
-    if (isXhs && project.pages?.length) {
-      const firstPageWithImage = project.pages.find(p => p.generated_image_url);
-      if (firstPageWithImage?.generated_image_url) {
-        return getImageUrl(firstPageWithImage.generated_image_url, firstPageWithImage.updated_at);
-      }
+    const pagesWithImage = getGeneratedPages(project).sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const firstPageWithImage = pagesWithImage[0];
+    if (firstPageWithImage?.generated_image_url) {
+      return getImageUrl(firstPageWithImage.generated_image_url, firstPageWithImage.updated_at);
     }
     return null;
   }
@@ -88,18 +144,17 @@ export const getStatusText = (project: Project): string => {
   const isXhs = project.product_type === 'xiaohongshu';
 
   if (isInfographic || isXhs) {
-    const materials = (project as Project & { materials?: Array<{ url?: string }> }).materials;
-    if (materials?.some((m) => m.url)) {
-      return '已完成';
-    }
+    const generatedCount = getGeneratedImageCount(project);
+    if (generatedCount > 0) return '已完成';
+    if (isInfographic) return '待生成图片';
     if (isXhs) {
-      const hasImages = project.pages?.some(p => p.generated_image_path);
-      if (hasImages) return '已完成';
-      const hasDescriptions = project.pages?.some(p => p.description_content);
-      if (hasDescriptions) return '待生成图片';
-      if (project.pages?.length) return '待生成描述';
+      const payload = parseJsonSafe(project.product_payload);
+      const hasBlueprint =
+        Array.isArray(payload?.cards) && payload.cards.length > 0 ||
+        (payload?.copywriting && Object.keys(payload.copywriting).length > 0);
+      return hasBlueprint ? '待生成图片' : '待生成文案';
     }
-    return '待生成描述';
+    return '待生成图片';
   }
 
   if (!project.pages || project.pages.length === 0) {
@@ -124,16 +179,8 @@ export const getProjectDisplayCount = (project: Project): { count: number; unit:
   const isXhs = project.product_type === 'xiaohongshu';
 
   if (isInfographic || isXhs) {
-    const materials = (project as Project & { materials?: unknown[] }).materials;
-    const materialsCount = materials?.length ?? 0;
-    if (materialsCount > 0) {
-      return { count: materialsCount, unit: '张' };
-    }
-    if (isXhs) {
-      const pageCount = project.pages?.length ?? 0;
-      return { count: pageCount, unit: '张' };
-    }
-    return { count: 0, unit: '张' };
+    const count = getGeneratedImageCount(project);
+    return { count, unit: '张' };
   }
 
   const count = project.pages?.length ?? 0;

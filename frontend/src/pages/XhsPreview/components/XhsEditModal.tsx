@@ -152,7 +152,7 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
     >
       <div className="space-y-4">
         <div
-          className={`relative ${aspectRatioClass} bg-gray-100 rounded-lg overflow-hidden`}
+          className={`relative ${aspectRatioClass} bg-gray-100 border border-border overflow-hidden`}
           onMouseDown={handleSelectionMouseDown}
           onMouseMove={handleSelectionMouseMove}
           onMouseUp={handleSelectionMouseUp}
@@ -170,7 +170,7 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
                     setSelectionRect(null);
                     setIsSelectingRegion(false);
                   }}
-                  className="px-2 py-1 rounded bg-white/80 text-[10px] text-gray-700 hover:bg-banana-50 shadow-sm flex items-center gap-1"
+                  className="px-2 py-1 bg-white hover:bg-black hover:text-white transition-colors text-[10px] text-primary shadow-sm flex items-center gap-1 border border-black"
                 >
                   <Sparkles size={12} />
                   <span>{isRegionSelectionMode ? '结束区域选图' : '区域选图'}</span>
@@ -184,7 +184,7 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
                       setSelectionStart(null);
                       setIsSelectingRegion(false);
                     }}
-                    className="px-2 py-1 rounded bg-white/80 text-[10px] text-gray-700 hover:bg-banana-50 shadow-sm"
+                    className="px-2 py-1 bg-white hover:bg-red-500 hover:text-white transition-colors text-[10px] text-primary shadow-sm border border-black"
                   >
                     清除选区
                   </button>
@@ -194,13 +194,13 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
                 ref={imageRef}
                 src={editImageUrl}
                 alt="xhs-card"
-                className="w-full h-full object-contain select-none"
+                className="w-full h-full object-contain select-none bg-white"
                 draggable={false}
                 crossOrigin="anonymous"
               />
               {selectionRect && (
                 <div
-                  className="absolute border-2 border-banana-500 bg-banana-400/10 pointer-events-none"
+                  className="absolute border-2 border-primary bg-black/10 pointer-events-none"
                   style={{
                     left: selectionRect.left,
                     top: selectionRect.top,
@@ -210,13 +210,13 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
                 />
               )}
               {isRegionSelectionMode && (
-                <div className="absolute bottom-2 left-2 text-[10px] text-gray-600 bg-white/80 border border-gray-200 rounded px-2 py-1">
+                <div className="absolute bottom-2 left-2 text-[10px] text-white bg-black/80 px-2 py-1 border border-white/20">
                   可多次拖拽选区，选中区域会加入下方"参考图"
                 </div>
               )}
             </>
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-secondary opacity-50 font-serif italic">
               暂无图片可编辑
             </div>
           )}
@@ -224,7 +224,7 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
 
         {editDescImageUrls.length > 0 && (
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-700">描述中的图片（可选）</div>
+            <div className="text-sm font-semibold text-primary">描述中的图片（可选）</div>
             <div className="grid grid-cols-3 gap-2">
               {editDescImageUrls.map((url, idx) => (
                 <button
@@ -237,14 +237,14 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
                       onSelectedDescImageUrlsChange([...selectedDescImageUrls, url]);
                     }
                   }}
-                  className={`relative border-2 rounded overflow-hidden ${
-                    selectedDescImageUrls.includes(url) ? 'border-banana-500' : 'border-gray-200'
+                  className={`relative border-2 overflow-hidden bg-white hover:opacity-90 transition-opacity ${
+                    selectedDescImageUrls.includes(url) ? 'border-primary ring-1 ring-primary' : 'border-transparent'
                   }`}
                 >
                   <img src={url} alt="desc" className="w-full h-20 object-cover" />
                   {selectedDescImageUrls.includes(url) && (
-                    <div className="absolute inset-0 bg-banana-500/20 flex items-center justify-center text-xs text-white">
-                      已选择
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-xs text-white font-bold tracking-wide">
+                      SELECTED
                     </div>
                   )}
                 </button>
@@ -260,9 +260,9 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
               id="xhs-use-template"
               checked={editTemplateUsageMode === 'template'}
               onChange={(e) => onEditTemplateUsageModeChange(e.target.checked ? 'template' : 'style')}
-              className="w-4 h-4 text-banana-600 rounded focus:ring-banana-500"
+              className="w-4 h-4 text-black border-2 border-gray-300 rounded-none focus:ring-0"
             />
-            <label htmlFor="xhs-use-template" className="text-sm text-gray-700 cursor-pointer">
+            <label htmlFor="xhs-use-template" className="text-sm text-primary cursor-pointer font-medium">
               使用模板图片作为参考
             </label>
           </div>
@@ -274,18 +274,19 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
           value={editInstruction}
           onChange={(e) => onEditInstructionChange(e.target.value)}
           rows={3}
+          className="rounded-none border-border focus:border-black resize-none"
         />
 
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
+        <div className="bg-white border border-border p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-gray-700">上传图片（可选）</div>
+            <div className="text-sm font-semibold text-primary">上传图片（可选）</div>
             <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={onOpenMaterialSelector}>
+              <Button variant="ghost" size="sm" onClick={onOpenMaterialSelector} className="rounded-none hover:bg-gray-100">
                 从素材库选择
               </Button>
               <label className="inline-flex">
                 <input type="file" multiple accept="image/*" className="hidden" onChange={handleEditAddFiles} />
-                <span className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 cursor-pointer">
+                <span className="inline-flex items-center justify-center px-3 py-1.5 text-sm border border-black bg-white hover:bg-black hover:text-white cursor-pointer transition-colors">
                   上传图片
                 </span>
               </label>
@@ -298,10 +299,10 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
                   <img
                     src={URL.createObjectURL(f)}
                     alt={`upload-${idx}`}
-                    className="w-20 h-20 object-cover rounded border border-gray-300"
+                    className="w-20 h-20 object-cover border border-border"
                   />
                   <button
-                    className="no-min-touch-target absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-black text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                     onClick={() => removeEditFile(idx)}
                     type="button"
                   >
@@ -311,18 +312,19 @@ export const XhsEditModal: React.FC<XhsEditModalProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-xs text-gray-500">可不选；也可以用「区域选图」把当前图的一部分加入参考。</div>
+            <div className="text-xs text-secondary opacity-60">可不选；也可以用「区域选图」把当前图的一部分加入参考。</div>
           )}
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={onClose} disabled={isSubmittingEdit}>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmittingEdit} className="rounded-none hover:bg-gray-100">
             取消
           </Button>
           <Button
             variant="primary"
             onClick={onSubmitEdit}
             disabled={!editInstruction.trim() || isSubmittingEdit}
+            className="bg-primary text-white hover:bg-black rounded-none px-6"
           >
             {isSubmittingEdit ? '提交中...' : '开始编辑'}
           </Button>

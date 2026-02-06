@@ -49,61 +49,67 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({
   getElapsedSeconds,
 }) => {
   return (
-    <aside className="w-full md:w-80 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col flex-shrink-0">
-      <div className="p-3 md:p-4 border-b border-gray-200 flex-shrink-0 space-y-2 md:space-y-3">
-        <Button
-          variant="primary"
-          icon={<Sparkles size={16} className="md:w-[18px] md:h-[18px]" />}
-          onClick={onGenerateAll}
-          className="w-full text-sm md:text-base"
-          disabled={pages.length === 0 || isBatchPreparing}
-        >
-          {isMultiSelectMode && selectedPageIds.size > 0
-            ? `生成选中页面 (${selectedPageIds.size})`
-            : `批量生成图片 (${pages.length})`}
-        </Button>
+    <aside className="w-full md:w-80 bg-white border-b md:border-b-0 md:border-r border-border flex flex-col flex-shrink-0 z-0">
+      <div className="p-4 border-b border-border flex-shrink-0">
+        <div className="bg-gray-50 p-1 rounded-xl border border-gray-100">
+          <Button
+            variant="primary"
+            icon={<Sparkles size={18} className={!isBatchPreparing ? "animate-pulse" : ""} />}
+            onClick={onGenerateAll}
+            className={`w-full h-12 rounded-lg font-bold tracking-wide shadow-sm transition-all duration-300
+              ${pages.length === 0 || isBatchPreparing 
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-gray-900 to-black text-white hover:shadow-md hover:scale-[1.02] active:scale-[0.98]'
+              }`}
+            disabled={pages.length === 0 || isBatchPreparing}
+          >
+            {isMultiSelectMode && selectedPageIds.size > 0
+              ? `生成选中页面 (${selectedPageIds.size})`
+              : `批量生成图片 (${pages.length})`}
+          </Button>
+        </div>
         {isBatchPreparing && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="truncate">{batchPreparingText || '正在准备...'}</span>
+          <div className="mt-2 flex items-center justify-center gap-2 text-xs font-medium text-gray-500 bg-gray-50 py-2 rounded-lg border border-dashed border-gray-200">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+            <span className="truncate">{batchPreparingText || '正在准备资源...'}</span>
           </div>
         )}
       </div>
 
       {/* 缩略图列表 */}
-      <div className="flex-1 overflow-y-auto md:overflow-y-auto overflow-x-auto md:overflow-x-visible p-3 md:p-4 min-h-0">
+      <div className="flex-1 overflow-y-auto md:overflow-y-auto overflow-x-auto md:overflow-x-visible p-4 min-h-0 bg-white">
         {/* 多选模式切换 */}
-        <div className="flex items-center gap-2 text-xs mb-3">
+        <div className="flex items-center justify-between gap-2 text-xs mb-4 pb-2 border-b border-gray-100">
           <button
             onClick={onToggleMultiSelectMode}
-            className={`px-2 py-1 rounded transition-colors flex items-center gap-1 ${
+            className={`flex items-center gap-1.5 transition-colors font-medium ${
               isMultiSelectMode
-                ? 'bg-banana-100 text-banana-700 hover:bg-banana-200'
-                : 'text-gray-500 hover:bg-gray-100'
+                ? 'text-primary'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             {isMultiSelectMode ? <CheckSquare size={14} /> : <Square size={14} />}
-            <span>{isMultiSelectMode ? '取消多选' : '多选'}</span>
+            <span>多选模式</span>
           </button>
           {isMultiSelectMode && (
-            <>
+            <div className="flex items-center gap-3">
+               {selectedPageIds.size > 0 && (
+                <span className="text-primary font-bold">
+                  {selectedPageIds.size}
+                </span>
+              )}
               <button
                 onClick={selectedPageIds.size === pages.length ? onDeselectAll : onSelectAll}
-                className="text-gray-500 hover:text-banana-600 transition-colors"
+                className="text-secondary hover:text-primary transition-colors"
               >
                 {selectedPageIds.size === pages.length ? '取消全选' : '全选'}
               </button>
-              {selectedPageIds.size > 0 && (
-                <span className="text-banana-600 font-medium">
-                  ({selectedPageIds.size}页)
-                </span>
-              )}
-            </>
+            </div>
           )}
         </div>
-        <div className="flex md:flex-col gap-2 md:gap-4 min-w-max md:min-w-0">
+        <div className="flex md:flex-col gap-3 md:gap-4 min-w-max md:min-w-0 pb-10">
           {pages.map((page, index) => (
-            <div key={page.id} className="md:w-full flex-shrink-0 relative">
+            <div key={page.id} className="md:w-full flex-shrink-0 relative group">
               {/* 移动端：简化缩略图 */}
               <div className="md:hidden relative">
                 <button
@@ -114,20 +120,20 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({
                       onSelectIndex(index);
                     }
                   }}
-                  className={`w-20 h-14 rounded border-2 transition-all ${
+                  className={`w-28 h-20 border transition-all ${
                     selectedIndex === index
-                      ? 'border-banana-500 shadow-md'
-                      : 'border-gray-200'
-                  } ${isMultiSelectMode && page.id && selectedPageIds.has(page.id) ? 'ring-2 ring-banana-400' : ''}`}
+                      ? 'border-primary ring-2 ring-gray-100'
+                      : 'border-border'
+                  } ${isMultiSelectMode && page.id && selectedPageIds.has(page.id) ? 'border-primary bg-gray-50' : ''}`}
                 >
                   {page.generated_image_path ? (
                     <img
                       src={getImageUrl(page.generated_image_path, page.updated_at)}
                       alt={`Slide ${index + 1}`}
-                      className="w-full h-full object-cover rounded"
+                      className={`w-full h-full object-cover ${isMultiSelectMode && page.id && selectedPageIds.has(page.id) ? 'grayscale opacity-80' : ''}`}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
+                    <div className="w-full h-full bg-gray-50 flex items-center justify-center text-xs text-gray-300 font-serif">
                       {index + 1}
                     </div>
                   )}
@@ -139,13 +145,13 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({
                       e.stopPropagation();
                       onTogglePageSelection(page.id!);
                     }}
-                    className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                    className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center transition-all ${
                       selectedPageIds.has(page.id)
-                        ? 'bg-banana-500 text-white'
-                        : 'bg-white border-2 border-gray-300'
+                        ? 'bg-primary text-white border-none'
+                        : 'bg-white border border-gray-300'
                     }`}
                   >
-                    {selectedPageIds.has(page.id) && <Check size={12} />}
+                    {selectedPageIds.has(page.id) && <Check size={10} />}
                   </button>
                 )}
               </div>
@@ -158,13 +164,13 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({
                       e.stopPropagation();
                       onTogglePageSelection(page.id!);
                     }}
-                    className={`absolute top-2 left-2 z-10 w-6 h-6 rounded flex items-center justify-center transition-all ${
+                    className={`absolute top-2 left-2 z-10 w-5 h-5 flex items-center justify-center transition-all ${
                       selectedPageIds.has(page.id)
-                        ? 'bg-banana-500 text-white shadow-md'
-                        : 'bg-white/90 border-2 border-gray-300 hover:border-banana-400'
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-white/90 border border-gray-300 hover:border-primary'
                     }`}
                   >
-                    {selectedPageIds.has(page.id) && <Check size={14} />}
+                    {selectedPageIds.has(page.id) && <Check size={12} />}
                   </button>
                 )}
                 <SlideCard

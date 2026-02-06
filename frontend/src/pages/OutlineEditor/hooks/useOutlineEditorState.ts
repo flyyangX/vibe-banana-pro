@@ -3,7 +3,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   useSensor,
   useSensors,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   KeyboardSensor,
   DragEndEvent,
 } from '@dnd-kit/core';
@@ -36,7 +37,6 @@ export const useOutlineEditorState = () => {
 
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [isAiRefining, setIsAiRefining] = useState(false);
-  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [outlinePageCount, setOutlinePageCount] = useState<string>('');
   const [infographicMode, setInfographicMode] = useState<'single' | 'series'>('single');
   const [pptAspectRatio, setPptAspectRatio] = useState<'16:9' | '4:3' | 'auto'>('16:9');
@@ -120,9 +120,21 @@ export const useOutlineEditorState = () => {
     }
   }, [currentProject?.product_type, infographicMode, outlinePageCount]);
 
-  // 拖拽传感器配置
+  // 拖拽传感器配置 - 官方最佳实践：MouseSensor + TouchSensor 分开配置
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // 桌面端：鼠标需移动 10px 才激活拖拽
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    }),
+    // 移动端：长按 250ms 才激活拖拽，tolerance 允许 5px 抖动
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -294,8 +306,6 @@ export const useOutlineEditorState = () => {
     selectedPage,
     isAiRefining,
     setIsAiRefining,
-    previewFileId,
-    setPreviewFileId,
     outlinePageCount,
     setOutlinePageCount,
     infographicMode,

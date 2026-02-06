@@ -45,21 +45,22 @@ export const DetailEditorPageSection: React.FC<DetailEditorPageSectionProps> = (
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+    <div className="flex flex-col space-y-8">
       {pages.map((page, index) => {
         const pageId = page.id || page.page_id;
         return (
-          <DescriptionCard
-            key={pageId}
-            page={page}
-            index={index}
-            totalPages={pages.length}
-            projectId={projectId}
-            onUpdate={(data) => onUpdatePage(pageId, data)}
-            onRegenerate={() => onRegeneratePage(pageId)}
-            isGenerating={pageId ? !!pageDescriptionGeneratingTasks[pageId] : false}
-            isAiRefining={isAiRefining}
-          />
+          <div key={pageId} id={`page-card-${pageId}`} className="scroll-mt-6">
+            <DescriptionCard
+              page={page}
+              index={index}
+              totalPages={pages.length}
+              projectId={projectId}
+              onUpdate={(data) => onUpdatePage(pageId, data)}
+              onRegenerate={() => onRegeneratePage(pageId)}
+              isGenerating={pageId ? !!pageDescriptionGeneratingTasks[pageId] : false}
+              isAiRefining={isAiRefining}
+            />
+          </div>
         );
       })}
     </div>

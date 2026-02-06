@@ -37,12 +37,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 key={option.value}
                 type="button"
                 onClick={() => onFieldChange(field.key, option.value)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-none text-sm font-medium transition-all ${
                   value === option.value
-                    ? option.value === 'openai'
-                      ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md'
-                      : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md'
-                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+                    ? 'bg-black text-white'
+                    : 'bg-white border border-gray-200 text-gray-700 hover:border-black'
                 }`}
               >
                 {option.label}
@@ -65,7 +63,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           <select
             value={value as string}
             onChange={(e) => onFieldChange(field.key, e.target.value)}
-            className="w-full h-10 px-4 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-banana-500 focus:border-transparent"
+            className="w-full h-10 px-4 rounded-none border border-gray-200 bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
           >
             {field.options.map((option) => (
               <option key={option.value} value={option.value}>
@@ -91,8 +89,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
             <button
               type="button"
               onClick={() => onFieldChange(field.key, !isEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-banana-500 focus:ring-offset-2 ${
-                isEnabled ? 'bg-banana-500' : 'bg-gray-200'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 ${
+                isEnabled ? 'bg-black' : 'bg-gray-200'
               }`}
             >
               <span

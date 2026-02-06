@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Edit2, FileText, ImagePlus, RefreshCw } from 'lucide-react';
-import { Card, ContextualStatusBadge, Button, Modal, Textarea, Skeleton, Markdown, MaterialSelector, useToast } from '@/components/shared';
+import { Button, Modal, Textarea, Markdown, MaterialSelector, useToast, ShimmerOverlay } from '@/components/shared';
 import { useDescriptionGeneratingState } from '@/hooks/useGeneratingState';
 import type { Page, PageType, DescriptionContent } from '@/types';
 import type { Material } from '@/api/endpoints';
@@ -27,6 +27,9 @@ export const DescriptionCard: React.FC<DescriptionCardProps> = ({
   isAiRefining = false,
 }) => {
   const { show } = useToast();
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
+
   const MATERIAL_SECTION_TITLE = '其他页面素材：';
 
   // 从 description_content 提取文本内容
@@ -66,6 +69,11 @@ export const DescriptionCard: React.FC<DescriptionCardProps> = ({
     setIsEditing(false);
   };
 
+  const handleImageClick = (src: string) => {
+     setPreviewImageSrc(src);
+     setIsPreviewOpen(true);
+  };
+
   const pageTypeLabels: Record<PageType, string> = {
     auto: '自动',
     cover: '封面',
@@ -80,25 +88,16 @@ export const DescriptionCard: React.FC<DescriptionCardProps> = ({
     const transitionKeywords = ['过渡', '章节', '部分', '目录', '篇章', 'section', 'part', 'agenda', 'outline', 'overview'];
     const endingKeywords = ['结尾', '总结', '致谢', '谢谢', 'ending', 'summary', 'thanks', 'q&a', 'qa', '结论', '回顾'];
 
-    if (index === 0) {
-      return { type: 'cover' as PageType, reason: '第 1 页默认封面' };
-    }
-    if (totalPages > 0 && index === totalPages - 1) {
-      return { type: 'ending' as PageType, reason: '最后一页默认结尾' };
-    }
-    if (transitionKeywords.some((keyword) => titleLower.includes(keyword))) {
-      return { type: 'transition' as PageType, reason: `标题包含关键词：${title}` };
-    }
-    if (endingKeywords.some((keyword) => titleLower.includes(keyword))) {
-      return { type: 'ending' as PageType, reason: `标题包含关键词：${title}` };
-    }
+    if (index === 0) return { type: 'cover' as PageType, reason: '第 1 页默认封面' };
+    if (totalPages > 0 && index === totalPages - 1) return { type: 'ending' as PageType, reason: '最后一页默认结尾' };
+    if (transitionKeywords.some((keyword) => titleLower.includes(keyword))) return { type: 'transition' as PageType, reason: `标题包含关键词：${title}` };
+    if (endingKeywords.some((keyword) => titleLower.includes(keyword))) return { type: 'ending' as PageType, reason: `标题包含关键词：${title}` };
     return { type: 'content' as PageType, reason: '默认内容页' };
   };
 
   const currentType = (page.page_type || 'auto') as PageType;
   const inferred = inferPageType();
   const displayType = currentType === 'auto' ? inferred.type : currentType;
-  const displayReason = currentType === 'auto' ? inferred.reason : '已手动指定页面类型';
 
   const getMaterialDisplayName = (material: Material): string =>
     material.prompt?.trim() ||
@@ -117,7 +116,7 @@ export const DescriptionCard: React.FC<DescriptionCardProps> = ({
         const alt = sanitizeAltText(getMaterialDisplayName(material));
         return `![${alt}](${material.url})`;
       })
-      .join('\n');
+      .join('\n'); // Join with newline, but CSS will interpret standard block flow until we force inline-block
 
   const updateDescriptionWithMaterials = (currentText: string, materials: Material[]): string => {
     const materialsMarkdown = buildMaterialsMarkdown(materials);
@@ -151,129 +150,140 @@ export const DescriptionCard: React.FC<DescriptionCardProps> = ({
         text: updatedText,
       } as DescriptionContent,
     });
-    show({ message: `已添加 ${materials.length} 个素材`, type: 'success' });
+    show({ message: `Included ${materials.length} Materials`, type: 'success' });
   };
 
   const materialCount = getMaterialCountFromText(text);
 
   return (
     <>
-      <Card className="p-0 overflow-hidden flex flex-col">
-        {/* 标题栏 */}
-        <div className="bg-banana-50 px-4 py-3 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">第 {index + 1} 页</span>
-              {page.part && (
-                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                  {page.part}
-                </span>
-              )}
-              <span
-                className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded"
-                title={displayReason}
-              >
-                {pageTypeLabels[displayType]}
-              </span>
-            </div>
-            <ContextualStatusBadge page={page} context="description" />
+      <div className="bg-white border border-gray-200 rounded-none mb-4 group hover:border-black transition-all duration-300">
+        <ShimmerOverlay show={isAiRefining} />
+        
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+          <div className="flex items-center gap-3">
+             <div className="flex flex-col items-center justify-center w-8 h-8 bg-black text-white">
+                <span className="font-mono text-xs font-bold">{String(index + 1).padStart(2, '0')}</span>
+             </div>
+             <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-2">
+                   {pageTypeLabels[displayType]}
+                   {page.part && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-none text-[10px]">{page.part}</span>}
+                </div>
+             </div>
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-xs text-gray-500">页面类型</span>
-            <select
-              value={currentType}
-              onChange={(e) => onUpdate({ page_type: e.target.value as PageType })}
-              className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-              disabled={generating}
-            >
-              <option value="auto">自动（{pageTypeLabels[inferred.type]}）</option>
-              <option value="cover">封面</option>
-              <option value="content">内容</option>
-              <option value="transition">过渡</option>
-              <option value="ending">结尾</option>
-            </select>
+          <div className="flex items-center gap-3">
+             {/* Status Indicator (Minimalist) */}
+             <div className="flex items-center gap-1.5 min-w-[20px] justify-end">
+                {generating ? (
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                        <RefreshCw size={10} className="animate-spin" />
+                        <span className="hidden sm:inline">生成中</span>
+                    </div>
+                ) : text ? (
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-black" title="AI 已生成内容">
+                         <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
+                         <span className="hidden sm:inline opacity-60">已生成</span>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-300">
+                        <div className="w-1.5 h-1.5 bg-gray-200 rounded-full"></div>
+                        <span className="hidden sm:inline">待生成</span>
+                    </div>
+                )}
+             </div>
+             
+             {/* Actions - Always visible on mobile, hover on desktop */}
+             <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button onClick={handleEdit} className="p-1.5 hover:bg-gray-100 rounded-none text-gray-400 hover:text-black transition-colors" title="编辑文本">
+                   <Edit2 size={14} />
+                </button>
+                <button onClick={() => setIsMaterialSelectorOpen(true)} className="p-1.5 hover:bg-gray-100 rounded-none text-gray-400 hover:text-black transition-colors" title="添加素材">
+                   <ImagePlus size={14} />
+                </button>
+                 <button onClick={onRegenerate} className="p-1.5 hover:bg-gray-100 rounded-none text-gray-400 hover:text-black transition-colors" title="重新生成">
+                   <RefreshCw size={14} className={generating ? 'animate-spin' : ''} />
+                </button>
+             </div>
           </div>
         </div>
 
-        {/* 内容 */}
-        <div className="p-4 flex-1">
-          {generating ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <div className="text-center py-4 text-gray-500 text-sm">
-                正在生成描述...
-              </div>
+        {/* Content */}
+        <div className="p-5 min-h-[120px]">
+           {generating ? (
+            <div className="space-y-4 animate-pulse">
+               <div className="h-2 bg-gray-100 w-3/4"></div>
+               <div className="h-2 bg-gray-100 w-full"></div>
+               <div className="h-2 bg-gray-100 w-5/6"></div>
+               <div className="flex gap-2 pt-2">
+                  <div className="w-16 h-16 bg-gray-100"></div>
+                  <div className="w-16 h-16 bg-gray-100"></div>
+               </div>
             </div>
-          ) : text ? (
-            <div className="text-sm text-gray-700">
-              <Markdown>{text}</Markdown>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-400">
-              <div className="flex text-3xl mb-2 justify-center"><FileText className="text-gray-400" size={48} /></div>
-              <p className="text-sm">尚未生成描述</p>
-            </div>
-          )}
+           ) : text ? (
+             <div className="text-sm text-gray-800 leading-relaxed font-serif">
+                {/* 
+                   We want thumbnails. 
+                   We pass a class that styles images as small inline-blocks.
+                   The Markdown component's img renderer now accepts imageClassName.
+                */}
+                <Markdown 
+                  imageClassName="inline-block w-24 h-24 object-cover border border-gray-200 hover:border-black transition-all cursor-zoom-in mr-2 mb-2"
+                  onImageClick={handleImageClick}
+                >
+                  {text}
+                </Markdown>
+             </div>
+           ) : (
+             <div className="h-full flex flex-col items-center justify-center text-gray-300 py-8">
+                <FileText size={32} className="mb-2 opacity-20" />
+                <span className="text-xs uppercase tracking-widest font-bold opacity-40">暂无描述</span>
+             </div>
+           )}
         </div>
+      </div>
 
-        {/* 操作栏 */}
-        <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-end gap-2 mt-auto">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<ImagePlus size={16} />}
-            onClick={() => setIsMaterialSelectorOpen(true)}
-            disabled={generating}
-          >
-            素材图{materialCount > 0 ? `(${materialCount})` : ''}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Edit2 size={16} />}
-            onClick={handleEdit}
-            disabled={generating}
-          >
-            编辑
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<RefreshCw size={16} className={generating ? 'animate-spin' : ''} />}
-            onClick={onRegenerate}
-            disabled={generating}
-          >
-            {generating ? '生成中...' : '重新生成'}
-          </Button>
-        </div>
-      </Card>
-
-      {/* 编辑对话框 */}
+      {/* Edit Modal */}
       <Modal
         isOpen={isEditing}
         onClose={() => setIsEditing(false)}
-        title="编辑页面描述"
+        title="编辑页面内容"
         size="lg"
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Textarea
-            label="描述内容"
+            label="内容详情"
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             rows={12}
+            className="font-serif text-base"
           />
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="ghost" onClick={() => setIsEditing(false)}>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <Button variant="ghost" onClick={() => setIsEditing(false)} className="uppercase text-xs font-bold">
               取消
             </Button>
-            <Button variant="primary" onClick={handleSave}>
-              保存
+            <Button variant="primary" onClick={handleSave} className="uppercase text-xs font-bold px-6">
+              保存更改
             </Button>
           </div>
         </div>
       </Modal>
+      
+      {/* Lightbox / Image Preview Modal */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 md:p-10" onClick={() => setIsPreviewOpen(false)}>
+           <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors" onClick={() => setIsPreviewOpen(false)}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+           </button>
+           <img 
+             src={previewImageSrc || ''} 
+             alt="Preview" 
+             className="max-w-full max-h-full object-contain shadow-2xl border border-gray-800"
+             onClick={(e) => e.stopPropagation()} 
+           />
+        </div>
+      )}
 
       {projectId && (
         <MaterialSelector

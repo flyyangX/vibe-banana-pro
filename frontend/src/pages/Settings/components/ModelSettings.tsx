@@ -132,7 +132,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
             return (
               <div
                 key={item.key}
-                className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-2"
+                className="p-4 bg-gray-50 border border-gray-200 rounded-none space-y-2"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, ImagePlus, Upload, X, FolderOpen } from 'lucide-react';
-import { Modal, Textarea, Button, useToast, MaterialSelector, Skeleton } from '@/components/shared';
+import { Modal, Textarea, Button, useToast, MaterialSelector } from '@/components/shared';
 import { generateMaterialImage, getTaskStatus } from '@/api/endpoints';
 import { getImageUrl } from '@/api/client';
 import { materialUrlToFile } from './MaterialSelector/index';
@@ -181,11 +181,11 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
       try {
         attempts++;
         const response = await getTaskStatus(resolvedProjectId, taskId);
-        const task: Task = response.data;
+        const task = response.data as Task;
 
         if (task.status === 'COMPLETED') {
           // 任务完成，从progress中获取结果
-          const progress = task.progress || {};
+          const progress = (task.progress || {}) as { image_url?: string };
           const imageUrl = progress.image_url;
           
           if (imageUrl) {
@@ -220,7 +220,7 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
         } else if (task.status === 'PENDING' || task.status === 'PROCESSING') {
           // 继续轮询
           if (attempts >= maxAttempts) {
-            show({ message: '素材生成超时，请稍后查看素材库', type: 'warning' });
+            show({ message: '素材生成超时，请稍后查看素材库', type: 'error' });
             setIsGenerating(false);
             setGeneratingStartedAt(null);
             clearStoredTask();
@@ -292,59 +292,64 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="素材生成" size="lg">
-      <blockquote className="text-sm text-gray-500 mb-4">生成的素材会保存到素材库</blockquote>
-      <div className="space-y-4">
+      <blockquote className="text-sm text-secondary mb-4 italic font-serif border-l-2 border-black pl-3 py-1 bg-gray-50">生成的素材会保存到素材库</blockquote>
+      <div className="space-y-6">
         {/* 顶部：生成结果预览（始终显示最新一次生成） */}
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-semibold text-gray-700">生成结果</h4>
+        <div className="bg-white border border-border p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+            <h4 className="text-sm font-bold text-primary tracking-wide uppercase">生成结果</h4>
             {isGenerating && (
-              <span className="text-xs text-gray-500">
-                生成中 · 已运行 {formatElapsed(generatingElapsed)}
+              <span className="text-xs font-mono text-secondary">
+                PROCESSING · {formatElapsed(generatingElapsed)}
               </span>
             )}
           </div>
           {isGenerating ? (
-            <div className="aspect-video rounded-lg overflow-hidden border border-gray-200">
-              <Skeleton className="w-full h-full" />
+            <div className="aspect-video overflow-hidden border border-border bg-gray-50 flex items-center justify-center">
+              <div className="flex flex-col items-center">
+                 <span className="w-8 h-8 border-2 border-gray-200 border-t-black animate-spin rounded-full mb-3" />
+                 <span className="text-xs font-mono text-secondary">GENERATING IMAGE...</span>
+              </div>
             </div>
           ) : previewUrl ? (
-            <div className="aspect-video bg-white rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+            <div className="aspect-video bg-white overflow-hidden border border-border flex items-center justify-center p-2">
               <img
                 src={previewUrl}
                 alt="生成的素材"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain shadow-sm"
               />
             </div>
           ) : (
-            <div className="aspect-video bg-gray-100 rounded-lg flex flex-col items-center justify-center text-gray-400 text-sm">
-              <div className="text-3xl mb-2">🎨</div>
-              <div>生成的素材会展示在这里</div>
+            <div className="aspect-video bg-gray-50 border border-border border-dashed flex flex-col items-center justify-center text-secondary text-sm">
+              <div className="mb-2 opacity-50">🎨</div>
+              <div className="font-serif italic text-xs">Generated result will appear here</div>
             </div>
           )}
         </div>
 
         {/* 提示词：原样传给模型 */}
         <Textarea
-          label="提示词（原样发送给文生图模型）"
+          label="提示词 (Prompts)"
           placeholder="例如：蓝紫色渐变背景，带几何图形和科技感线条，用于科技主题标题页..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={3}
+          className="rounded-none border-border focus:border-black resize-none"
         />
 
         {/* 参考图上传区 */}
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-3">
+        <div className="bg-white border border-border p-4 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <ImagePlus size={16} className="text-gray-500" />
-              <span className="font-medium">参考图片（可选）</span>
+            <div className="flex items-center gap-2 text-sm text-primary font-bold">
+              <ImagePlus size={16} />
+              <span className="uppercase tracking-wide text-xs">Reference Images</span>
             </div>
             <Button
               variant="ghost"
               size="sm"
               icon={<FolderOpen size={16} />}
               onClick={() => setIsMaterialSelectorOpen(true)}
+              className="text-xs hover:bg-black hover:text-white rounded-none border border-transparent hover:border-black transition-all"
             >
               从素材库选择
             </Button>
@@ -352,8 +357,8 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
           <div className="flex flex-wrap gap-4">
             {/* 主参考图（可选） */}
             <div className="space-y-2">
-              <div className="text-xs text-gray-600">主参考图（可选）</div>
-              <label className="w-40 h-28 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-pointer hover:border-banana-500 transition-colors bg-white relative group">
+              <div className="text-[10px] uppercase font-bold text-secondary tracking-wider">Primary Reference</div>
+              <label className="w-32 h-24 border border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 transition-all bg-white relative group">
                 {refImage ? (
                   <>
                     <img
@@ -368,15 +373,15 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
                         e.stopPropagation();
                         setRefImage(null);
                       }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow z-10"
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow z-10 hover:bg-red-600"
                     >
-                      <X size={12} />
+                      <X size={10} />
                     </button>
                   </>
                 ) : (
                   <>
-                    <ImageIcon size={24} className="text-gray-400 mb-1" />
-                    <span className="text-xs text-gray-500">点击上传</span>
+                    <ImageIcon size={18} className="text-secondary mb-1 opacity-50" />
+                    <span className="text-[10px] text-secondary">CLICK UPLOAD</span>
                   </>
                 )}
                 <input
@@ -390,26 +395,26 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
 
             {/* 额外参考图（可选） */}
             <div className="flex-1 space-y-2 min-w-[180px]">
-              <div className="text-xs text-gray-600">额外参考图（可选，多张）</div>
+              <div className="text-[10px] uppercase font-bold text-secondary tracking-wider">Additional References</div>
               <div className="flex flex-wrap gap-2">
                 {extraImages.map((file, idx) => (
                   <div key={idx} className="relative group">
                     <img
                       src={URL.createObjectURL(file)}
                       alt={`extra-${idx + 1}`}
-                      className="w-20 h-20 object-cover rounded border border-gray-300"
+                      className="w-16 h-16 object-cover border border-border"
                     />
                     <button
                       onClick={() => removeExtraImage(idx)}
-                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-2 -right-2 w-4 h-4 bg-black text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                     >
-                      <X size={12} />
+                      <X size={10} />
                     </button>
                   </div>
                 ))}
-                <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-pointer hover:border-banana-500 transition-colors bg-white">
-                  <Upload size={18} className="text-gray-400 mb-1" />
-                  <span className="text-[11px] text-gray-500">添加</span>
+                <label className="w-16 h-16 border border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 transition-all bg-white text-secondary hover:text-black">
+                  <Upload size={14} className="mb-0.5" />
+                  <span className="text-[9px] uppercase">Add</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -423,14 +428,15 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={handleClose} disabled={isGenerating}>
+        <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <Button variant="ghost" onClick={handleClose} disabled={isGenerating} className="rounded-none hover:bg-gray-100 text-secondary hover:text-black">
             关闭
           </Button>
           <Button
             variant="primary"
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim()}
+            className="rounded-none bg-black text-white hover:bg-gray-800 px-6"
           >
             {isGenerating ? '生成中...' : '生成素材'}
           </Button>
@@ -438,7 +444,7 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
       </div>
       {/* 素材选择器 */}
       <MaterialSelector
-        projectId={projectId}
+        projectId={projectId || undefined}
         isOpen={isMaterialSelectorOpen}
         onClose={() => setIsMaterialSelectorOpen(false)}
         onSelect={handleSelectMaterials}

@@ -3,6 +3,7 @@ export { Input } from './Input';
 export { Textarea } from './Textarea';
 export { Card } from './Card';
 export { Modal } from './Modal';
+export * from './Logo';
 export { Loading, Skeleton } from './Loading';
 export { Toast, useToast } from './Toast';
 export { StatusBadge } from './StatusBadge';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, Save, RotateCcw } from 'lucide-react';
-import { Button, Card, Loading, useToast, useConfirm } from '@/components/shared';
+import { Button, Loading, useToast, useConfirm } from '@/components/shared';
 import { useSettingsState } from './hooks/useSettingsState';
 import { GeneralSettings } from './components/GeneralSettings';
 import { ApiSettings } from './components/ApiSettings';
@@ -104,24 +104,23 @@ export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-banana-50 to-yellow-50">
+    <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <Card className="p-6 md:p-8">
+        <div className="bg-white border-2 border-primary p-6 md:p-10 relative">
           <div className="space-y-8">
             {/* 顶部标题 */}
-            <div className="flex items-center justify-between pb-6 border-b border-gray-200">
+            <div className="flex items-center justify-between pb-6 border-b border-border">
               <div className="flex items-center">
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   icon={<Home size={18} />}
                   onClick={() => navigate('/')}
-                  className="mr-4"
-                >
-                  返回首页
-                </Button>
+                  className="mr-6 hover:bg-gray-100 h-10 w-10 p-0 rounded-full flex items-center justify-center border border-transparent"
+                  title="返回首页"
+                />
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">系统设置</h1>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <h1 className="text-3xl font-serif font-medium text-primary">系统设置</h1>
+                  <p className="text-sm font-sans text-secondary mt-1">
                     配置应用的各项参数
                   </p>
                 </div>
@@ -130,7 +129,7 @@ export const SettingsPage: React.FC = () => {
 
             <Settings />
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
